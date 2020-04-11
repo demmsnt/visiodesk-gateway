@@ -1,3 +1,19 @@
+__Python virtual environment__
+<pre>  
+python -m venv visiodesk-gateway/venv
+</pre>
+python environment should be activated
+<pre>
+visiodesk-gateway/venv/Scripts/activate.bat
+</pre>
+using pip freeze command to output current dependency list and it can be saved into txt file and used later for install all necessary dependencies
+<pre>
+pip freeze > dependencies.txt
+</pre>
+<pre>
+pip install -r dependencies.txt
+</pre>
+
 __Visiobas Gateway Server (VGS)__  
 default protocol: __JSON-RPC 2.0__
 
