@@ -1,0 +1,38 @@
+analog-input #3000022
+{
+    object-identifier: (Analog Value, 1)
+    object-name: "ANALOG VALUE 1"
+    object-type: "analog-input"
+    present-value: 0.000000
+    status-flags: {false,false,false,false}
+    event-state: normal
+    out-of-service: FALSE
+    units: percent
+    description: "ANALOG VALUE 1"
+    priority-array: {Null,
+        Null,
+        Null,
+        Null,
+        Null,
+        Null,
+        Null,
+        Null,
+        Null,
+        Null,
+        Null,
+        Null,
+        Null,
+        Null,
+        Null,
+        Null}
+    relinquish-default: 0.000000
+    time-delay: 0
+    notification-class: 4194303
+    high-limit: 0.000000
+    low-limit: 0.000000
+    deadband: 0.000000
+    limit-enable: {false,false}
+    event-enable: {false,false,false}
+    acked-transitions: {true,true,true}
+    notify-type: 0
+}

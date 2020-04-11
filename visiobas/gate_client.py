@@ -1,5 +1,5 @@
-from visiobas_client import VisiobasClient
-from visiobas_object_type import ObjectType
+from visiobas.client import VisiobasClient
+from visiobas.object_type import ObjectType
 import json
 
 

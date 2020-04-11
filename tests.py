@@ -1,10 +1,9 @@
-import certifi
 import unittest
-from visiobas_client import VisiobasClient
-from visiobas_gate_client import VisiobasGateClient
-from visiobas_object_type import ObjectType
-from visiobas_property import ObjectProperty
-import visiobas_logging
+from visiobas.client import VisiobasClient
+from visiobas.gate_client import VisiobasGateClient
+from visiobas.object_type import ObjectType
+from visiobas.property import ObjectProperty
+import visiobas.logging
 from random import randrange
 
 LOCAL = {
@@ -34,7 +33,7 @@ PWD = SERVER[USING_SERVER]["pwd"]
 
 class TestVisiobasClient(unittest.TestCase):
     def setUp(self):
-        visiobas_logging.initialize_logging()
+        visiobas.logging.initialize_logging()
         self.client = VisiobasClient(HOST, PORT, verify=False)
         self.client.rq_login(USER, PWD)
 
@@ -52,7 +51,7 @@ class TestVisiobasClient(unittest.TestCase):
 
 class TestVisiobasGateClient(unittest.TestCase):
     def setUp(self):
-        visiobas_logging.initialize_logging()
+        visiobas.logging.initialize_logging()
         self.client = VisiobasGateClient(HOST, PORT, verify=False)
         self.client.rq_login(USER, PWD)
 
