@@ -85,3 +85,7 @@ class TestVisiobasGateClient(unittest.TestCase):
             }
             data.append(d)
         self.client.rq_put(device_id, data)
+
+
+if __name__ == '__main__':
+    unittest.main()

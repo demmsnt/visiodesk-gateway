@@ -13,7 +13,7 @@ class TokenType(enum.Enum):
     OPEN_BRACE = '['
     CLOSE_BRACE = ']'
     COMMA = ','
-    SEMICOLON = ';'
+    SEMICOLON = ':'
     NULL = 'Null'
     QUOTE = '"'
     TRUE = 'true'
@@ -55,15 +55,23 @@ class CharReader:
         else:
             self.current_char = self.text[self.pos]
         self._skip_whitespace()
+        return self.current_char
+
+    def seek(self, pos):
+        self.pos = pos
+
+    def tell(self):
+        return self.pos
 
 
 class TokenParser:
     def __init__(self, char_reader):
+        """
+        :param char_reader:
+        :type char_reader: CharReader
+        """
         self.next_parser = None
         self.char_reader = char_reader
-
-    def parse(self):
-        pass
 
     def set_next_parser(self, next_parser):
         self.next_parser = next_parser
@@ -75,27 +83,35 @@ class TokenParser:
             value += c
             c = self.char_reader.read()
 
+    def parse_next_token(self):
+        """
+        Parse next token from char reader and return token or None
+        """
+        token_parser = self
+        token = None
+        pos = self.char_reader.tell()
+        while token_parser is not None:
+            token = token_parser._try_parse_next_token()
+            if token is not None:
+                break
+            else:
+                token_parser = token_parser.next_parser
+                self.char_reader.seek(pos)
+        return token
+
+    def _try_parse_next_token(self):
+        raise Exception("Unimplemented handle")
+
 
 class AnyTokenParser(TokenParser):
     def __init__(self, char_reader):
         super().__init__(char_reader)
 
-    def handle(self, c):
+    def _try_parse_next_token(self):
         return Token(TokenType.ANY)
 
 
-class HashTokenParser(TokenParser):
-    def __init__(self, char_reader):
-        super().__init__(char_reader)
-
-    def handle(self, c):
-        if not c == '#':
-            return None
-
-        return Token(TokenType.HASH, self._integer())
-
-
-class NumberTokenParser(TokenParser):
+class NumberOrStringTokenParser(TokenParser):
     def __init__(self, char_reader):
         super().__init__(char_reader)
         self.keywords = ["null", "true", "false", "inf", "-inf"]
@@ -107,35 +123,107 @@ class NumberTokenParser(TokenParser):
             Token(TokenType.NUMBER, -math.inf)
         ]
 
-    def handle(self, c):
+    def _extract_string(self):
+        c = self.char_reader.current_char
         starts_with_digit = c.isdigit()
         starts_with_minus = c is '-'
+        value = ''
         if c.isalpha() or starts_with_digit or starts_with_minus:
-            value = ''
             while c is not None and (c.isalpha() or c.isdigit() or c is '-' or c is '.'):
                 value += c
                 c = self.char_reader.read()
+        return value
 
-            # special keywords tokens
-            value = value.lower()
-            if value in self.keywords:
-                return self.tokens[self.keywords.index(value)]
-
-            if starts_with_digit or starts_with_minus:
-                try:
-                    return Token(TokenType.NUMBER, float(value))
-                except:
-                    return Token(TokenType.STRING, value)
-        else:
+    def _try_parse_next_token(self):
+        value = self._extract_string()
+        if len(value) == 0:
             return None
+
+        # special keywords tokens
+        value = value.lower()
+        if value in self.keywords:
+            return self.tokens[self.keywords.index(value)]
+
+        # check if token is number
+        starts_with_minus = value.startswith('-')
+        starts_with_digit = value[0].isdigit()
+        if starts_with_digit or starts_with_minus:
+            try:
+                return Token(TokenType.NUMBER, float(value))
+            except:
+                return Token(TokenType.STRING, value)
+        else:
+            return Token(TokenType.STRING, value)
+
+
+class IntegerTokenParser(NumberOrStringTokenParser):
+
+    def _try_parse_next_token(self):
+        value = self._extract_string()
+        if len(value) == 0:
+            return None
+        try:
+            return Token(TokenType.NUMBER, int(value))
+        except:
+            return None
+
+
+class HashTokenParser(IntegerTokenParser):
+    def __init__(self, char_reader):
+        super().__init__(char_reader)
+
+    def _try_parse_next_token(self):
+        c = self.char_reader.current_char
+        if not c == '#':
+            return None
+        self.char_reader.read()
+        return super()._try_parse_next_token()
+
+
+class PunctuationTokenParser(TokenParser):
+
+    def __init__(self, char_reader):
+        super().__init__(char_reader)
+
+    def _try_parse_next_token(self):
+        c = self.char_reader.current_char
+        if c is ':':
+            return Token(TokenType.SEMICOLON)
+        elif c is ',':
+            return Token(TokenType.COMMA)
+        elif c is '{':
+            return Token(TokenType.OPEN_GROUP)
+        elif c is '}':
+            return Token(TokenType.CLOSE_GROUP)
 
 
 class Tokenizer:
     def __init__(self, char_reader):
         self.char_reader = char_reader
+        hash_token_parser = HashTokenParser(char_reader)
+        number_or_string_token_parser = NumberOrStringTokenParser(char_reader)
+        number_or_string_token_parser.set_next_parser(hash_token_parser)
+        self.head_parser = number_or_string_token_parser
+        self.tokens = []
 
     def error(self):
         raise Exception('invalid character')
 
-    def get_next_token(self):
-        pass
+    def _get_next_token(self):
+        return self.head_parser.parse_next_token()
+
+    def tokenize(self):
+        token = self._get_next_token()
+        while token is not None:
+            self.tokens.append(token)
+            token = self._get_next_token()
+        return self.tokens
+
+
+class BACnetParser:
+    def parse_bacrpm(self, text):
+        char_reader = CharReader(text)
+        tokenizer = Tokenizer(char_reader)
+        tokens = tokenizer.tokenize()
+        for token in tokens:
+            print(token)
