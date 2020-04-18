@@ -1,6 +1,8 @@
 import enum
 import math
 
+import logging
+
 
 class TokenType(enum.Enum):
     STRING = 'string'
@@ -44,21 +46,22 @@ class CharReader:
         self.pos = 0
         self.current_char = self.text[self.pos]
 
-    def _skip_whitespace(self):
+    def skip_whitespace(self):
         while self.current_char is not None and self.current_char.isspace():
-            self.read()
+            self.read(skip_whitespace=True)
 
-    def read(self):
-        self.pos += 1
-        if self.pos > len(self.text) - 1:
-            self.current_char = None
-        else:
-            self.current_char = self.text[self.pos]
-        self._skip_whitespace()
+    def read(self, skip_whitespace=True):
+        self.seek(self.pos + 1)
+        if skip_whitespace:
+            self.skip_whitespace()
         return self.current_char
 
     def seek(self, pos):
         self.pos = pos
+        if self.pos > len(self.text) - 1:
+            self.current_char = None
+        else:
+            self.current_char = self.text[self.pos]
 
     def tell(self):
         return self.pos
@@ -72,6 +75,7 @@ class TokenParser:
         """
         self.next_parser = None
         self.char_reader = char_reader
+        self.logger = logging.getLogger(__name__)
 
     def set_next_parser(self, next_parser):
         self.next_parser = next_parser
@@ -125,24 +129,28 @@ class NumberOrStringTokenParser(TokenParser):
 
     def _extract_string(self):
         c = self.char_reader.current_char
+        if c is None:
+            return ''
+
         starts_with_digit = c.isdigit()
-        starts_with_minus = c is '-'
+        starts_with_minus = c == '-'
         value = ''
         if c.isalpha() or starts_with_digit or starts_with_minus:
-            while c is not None and (c.isalpha() or c.isdigit() or c is '-' or c is '.'):
+            while c is not None and (c.isalpha() or c.isdigit() or c == '-' or c == '.'):
                 value += c
-                c = self.char_reader.read()
+                c = self.char_reader.read(skip_whitespace=False)
         return value
 
     def _try_parse_next_token(self):
+        self.char_reader.skip_whitespace()
         value = self._extract_string()
         if len(value) == 0:
             return None
 
         # special keywords tokens
-        value = value.lower()
-        if value in self.keywords:
-            return self.tokens[self.keywords.index(value)]
+        probably_keyword = value.lower()
+        if probably_keyword in self.keywords:
+            return self.tokens[self.keywords.index(probably_keyword)]
 
         # check if token is number
         starts_with_minus = value.startswith('-')
@@ -156,14 +164,55 @@ class NumberOrStringTokenParser(TokenParser):
             return Token(TokenType.STRING, value)
 
 
-class IntegerTokenParser(NumberOrStringTokenParser):
+class QuotedStringTokenParser(TokenParser):
+
+    def __init__(self, char_reader):
+        super().__init__(char_reader)
 
     def _try_parse_next_token(self):
+        self.char_reader.skip_whitespace()
+        c = self.char_reader.current_char
+        if not c == '"':
+            return None
+        value = "\""
+        prev_c = '"'
+        c = self.char_reader.read()
+        while c is not None and not prev_c == '\\' and not c == '"':
+            try:
+                value += c
+                prev_c = c
+                c = self.char_reader.read(skip_whitespace=False)
+            except:
+                self.logger.debug("Failed parse quoted string, value: {}".format(value))
+        value += '"'
+        # move next char because current char is "
+        self.char_reader.read(skip_whitespace=False)
+        return Token(TokenType.STRING, value)
+
+
+class IntegerTokenParser(NumberOrStringTokenParser):
+
+    def _extract_integer(self):
+        """
+        :return: extract next string and parse it as integer value
+        """
         value = self._extract_string()
         if len(value) == 0:
             return None
+        if len(value) == 0:
+            return None
         try:
-            return Token(TokenType.NUMBER, int(value))
+            return int(value)
+        except:
+            return None
+
+    def _try_parse_next_token(self):
+        self.char_reader.skip_whitespace()
+        value = self._extract_integer()
+        if value is None:
+            return None
+        try:
+            return Token(TokenType.NUMBER, value)
         except:
             return None
 
@@ -173,11 +222,19 @@ class HashTokenParser(IntegerTokenParser):
         super().__init__(char_reader)
 
     def _try_parse_next_token(self):
+        self.char_reader.skip_whitespace()
         c = self.char_reader.current_char
         if not c == '#':
             return None
-        self.char_reader.read()
-        return super()._try_parse_next_token()
+        # move char reader to next char
+        c = self.char_reader.read()
+        if c is None:
+            return None
+
+        value = self._extract_integer()
+        if value is not None:
+            return Token(TokenType.HASH, value)
+        return Token
 
 
 class PunctuationTokenParser(TokenParser):
@@ -186,15 +243,29 @@ class PunctuationTokenParser(TokenParser):
         super().__init__(char_reader)
 
     def _try_parse_next_token(self):
+        self.char_reader.skip_whitespace()
         c = self.char_reader.current_char
-        if c is ':':
-            return Token(TokenType.SEMICOLON)
-        elif c is ',':
-            return Token(TokenType.COMMA)
-        elif c is '{':
-            return Token(TokenType.OPEN_GROUP)
-        elif c is '}':
-            return Token(TokenType.CLOSE_GROUP)
+        token = None
+        if c == ':':
+            token = Token(TokenType.SEMICOLON)
+        elif c == ',':
+            token = Token(TokenType.COMMA)
+        elif c == '{':
+            token = Token(TokenType.OPEN_GROUP)
+        elif c == '}':
+            token = Token(TokenType.CLOSE_GROUP)
+        elif c == '[':
+            token = Token(TokenType.OPEN_BRACE)
+        elif c == ']':
+            token = Token(TokenType.CLOSE_BRACE)
+        elif c == '(':
+            token = Token(TokenType.OPEN_TUPLE)
+        elif c == ')':
+            token = Token(TokenType.CLOSE_TUPLE)
+        if token is not None:
+            # move to next
+            self.char_reader.read()
+        return token
 
 
 class Tokenizer:
@@ -202,8 +273,13 @@ class Tokenizer:
         self.char_reader = char_reader
         hash_token_parser = HashTokenParser(char_reader)
         number_or_string_token_parser = NumberOrStringTokenParser(char_reader)
-        number_or_string_token_parser.set_next_parser(hash_token_parser)
-        self.head_parser = number_or_string_token_parser
+        punctuation_parser = PunctuationTokenParser(char_reader)
+        quoted_string_parser = QuotedStringTokenParser(char_reader)
+
+        punctuation_parser.set_next_parser(hash_token_parser)
+        hash_token_parser.set_next_parser(number_or_string_token_parser)
+        number_or_string_token_parser.set_next_parser(quoted_string_parser)
+        self.head_parser = punctuation_parser
         self.tokens = []
 
     def error(self):
