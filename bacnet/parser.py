@@ -1,8 +1,7 @@
 import enum
 import math
-
 import logging
-
+import bacnet
 
 class TokenType(enum.Enum):
     STRING = 'string'
@@ -46,11 +45,13 @@ class CharReader:
         self.pos = 0
         self.current_char = self.text[self.pos]
 
-    def skip_whitespace(self):
-        while self.current_char is not None and self.current_char.isspace():
-            self.read(skip_whitespace=True)
+    def skip_whitespace(self, ignore_eol=True):
+        while self.current_char is not None \
+                and self.current_char.isspace() \
+                and (self.current_char != '\n' or ignore_eol):
+            self.read(skip_whitespace=True, ignore_eol=ignore_eol)
 
-    def read(self, skip_whitespace=True):
+    def read(self, skip_whitespace=True, ignore_eol=True):
         self.seek(self.pos + 1)
         if skip_whitespace:
             self.skip_whitespace()
@@ -58,10 +59,7 @@ class CharReader:
 
     def seek(self, pos):
         self.pos = pos
-        if self.pos > len(self.text) - 1:
-            self.current_char = None
-        else:
-            self.current_char = self.text[self.pos]
+        self.current_char = self.text[self.pos] if self.pos < len(self.text) else None
 
     def tell(self):
         return self.pos
@@ -120,9 +118,9 @@ class NumberOrStringTokenParser(TokenParser):
         super().__init__(char_reader)
         self.keywords = ["null", "true", "false", "inf", "-inf"]
         self.tokens = [
-            Token(TokenType.NULL),
-            Token(TokenType.TRUE),
-            Token(TokenType.FALSE),
+            Token(TokenType.NULL, None),
+            Token(TokenType.TRUE, True),
+            Token(TokenType.FALSE, False),
             Token(TokenType.NUMBER, math.inf),
             Token(TokenType.NUMBER, -math.inf)
         ]
@@ -162,6 +160,22 @@ class NumberOrStringTokenParser(TokenParser):
                 return Token(TokenType.STRING, value)
         else:
             return Token(TokenType.STRING, value)
+
+
+class WhitespaceTokenParser(TokenParser):
+
+    def __init__(self, char_reader):
+        super().__init__(char_reader)
+
+    def _try_parse_next_token(self):
+        self.char_reader.skip_whitespace(ignore_eol=False)
+        c = self.char_reader.current_char
+        if c is None:
+            return None
+        if c == '\n':
+            self.char_reader.read(skip_whitespace=True, ignore_eol=False)
+            return Token(TokenType.EOL, None)
+        return None
 
 
 class QuotedStringTokenParser(TokenParser):
@@ -275,11 +289,13 @@ class Tokenizer:
         number_or_string_token_parser = NumberOrStringTokenParser(char_reader)
         punctuation_parser = PunctuationTokenParser(char_reader)
         quoted_string_parser = QuotedStringTokenParser(char_reader)
+        whitespace_parser = WhitespaceTokenParser(char_reader)
 
+        whitespace_parser.set_next_parser(punctuation_parser)
         punctuation_parser.set_next_parser(hash_token_parser)
         hash_token_parser.set_next_parser(number_or_string_token_parser)
         number_or_string_token_parser.set_next_parser(quoted_string_parser)
-        self.head_parser = punctuation_parser
+        self.head_parser = whitespace_parser
         self.tokens = []
 
     def error(self):
@@ -296,10 +312,177 @@ class Tokenizer:
         return self.tokens
 
 
+class TokenReader:
+    def __init__(self, tokens) -> None:
+        super().__init__()
+        self.tokens = tokens
+        self.pos = 0
+        self.current_token = self.tokens[self.pos]
+
+    def seek(self, pos):
+        self.pos = pos
+        self.current_token = self.tokens[self.pos] if len(self.tokens) < pos else None
+
+    def tell(self):
+        return self.pos
+
+    def read(self):
+        self.seek(self.pos + 1)
+        return self.current_token
+
+
+class EntityPairParser:
+
+    def __init__(self, token_reader) -> None:
+        """
+        Entity pair parser trying to find
+        key as tokens until semicolon
+        value as rest of tokens until EOL
+        :param token_reader:
+        :type token_reader TokenReader
+        """
+        super().__init__()
+        self.token_reader = token_reader
+        self.next_parser = None
+
+    def _extract_key(self):
+        key = ""
+        token = self.token_reader.current_token
+        while token is not None and token.type != TokenType.SEMICOLON:
+            key += str(token.value) if token.value is not None else ""
+            token = self.token_reader.read()
+        if token is not None and token.type == TokenType.SEMICOLON:
+            # going to next after semicolon token
+            self.token_reader.read()
+        return key
+
+    def _extract_value(self):
+        value = ""
+        token = self.token_reader.current_token
+        while token is not None and token.type != TokenType.EOL:
+            value += str(token.value) if token.value is not None else ""
+            token = self.token_reader.read()
+        if token is not None and token.type == TokenType.EOL:
+            # going to next after EOL token
+            self.token_reader.read()
+        return value
+
+    def _try_parse_next_entity(self):
+        key = self._extract_key()
+        if key == "":
+            return None
+        value = self._extract_value()
+        if value == "":
+            return None
+        return [(key, value)]
+
+    def parse_next_entity(self):
+        parser = self
+        while parser is not None:
+            entity = parser._try_parse_next_entity()
+            if entity is not None:
+                return entity
+            else:
+                parser = parser.next_parser
+
+
+class StringArrayParser(EntityPairParser):
+
+    def __init__(self, token_reader):
+        super().__init__(token_reader)
+
+    def _extract_values(self):
+        token = self.token_reader.current_token
+        if token is None:
+            return None
+        opening_token_types = [TokenType.OPEN_TUPLE, TokenType.OPEN_BRACE, TokenType.OPEN_GROUP]
+        closing_token_types = [TokenType.CLOSE_TUPLE, TokenType.CLOSE_BRACE, TokenType.CLOSE_GROUP]
+        values = None
+        if token.type in opening_token_types:
+            values = []
+            idx_opening_token_type = opening_token_types.index(token.type)
+            while token is not None and token.type != closing_token_types[idx_opening_token_type]:
+                # does not expect separate tokens described one entity
+                if token.type == TokenType.STRING \
+                        or token.type == TokenType.NUMBER \
+                        or token.type == TokenType.TRUE \
+                        or token.type == TokenType.FALSE \
+                        or token.type == TokenType.NULL:
+                    values.append(token.value)
+                token = self.token_reader.read()
+        return values
+
+    def _try_parse_next_entity(self):
+        key = self._extract_key()
+        if key == "":
+            return None
+        values = self._extract_values()
+        if values is None:
+            return None
+        if len(values) == 0:
+            return None
+        return [(key, values)]
+
+
+class ObjectIdentifierParser(StringArrayParser):
+
+    def __init__(self, token_parser):
+        super().__init__(token_parser)
+
+    def _try_parse_next_entity(self):
+        key = self._extract_key()
+        if not key == "object-identifier":
+            return None
+        values = self._extract_values()
+        if values is None or len(values) != 2:
+            return None
+        return [
+            ("object-type", values[0]),
+            ("object-identifier", values[1])
+        ]
+
+
+class Entitynizer:
+
+    def __init__(self, tokens):
+        token_reader = TokenReader(tokens)
+
+        # this settings can be encapsulated into Entitinizer?
+        any_pair_parser = EntityPairParser(token_reader)
+        array_parser = StringArrayParser(token_reader)
+        object_identifier_parser = ObjectIdentifierParser(token_reader)
+        object_identifier_parser.next_parser = array_parser
+        array_parser.next_parser = any_pair_parser
+        self._head_parser = object_identifier_parser
+        self._entities = []
+
+    def entitynize(self):
+        entities = self._head_parser.parse_next_entity()
+        while entities is not None:
+            for entity in entities:
+                self._entities.append(entity)
+            entities = self._head_parser.parse_next_entity()
+        return self._entities
+
+
 class BACnetParser:
+    def __init__(self):
+        self.logger = logging.getLogger(__name__)
+
     def parse_bacrpm(self, text):
         char_reader = CharReader(text)
         tokenizer = Tokenizer(char_reader)
         tokens = tokenizer.tokenize()
-        for token in tokens:
-            print(token)
+        if self.logger.isEnabledFor(logging.DEBUG):
+            idx = 0
+            for token in tokens:
+                self.logger.debug("[{}] {}".format(idx, token))
+        entitynizer = Entitynizer(tokens)
+        entities = entitynizer.entitynize()
+        bacnet_object = {}
+        for entity in entities:
+            name = entity[0]
+            value = entity[1]
+            if name in bacnet.property.map:
+                bacnet_object[bacnet.property.map[name]] = value
+        return bacnet_object
