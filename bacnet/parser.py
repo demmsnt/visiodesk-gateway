@@ -1,7 +1,8 @@
 import enum
 import math
 import logging
-import bacnet
+from bacnet import bacnet_property
+
 
 class TokenType(enum.Enum):
     STRING = 'string'
@@ -261,28 +262,65 @@ class PunctuationTokenParser(TokenParser):
         c = self.char_reader.current_char
         token = None
         if c == ':':
-            token = Token(TokenType.SEMICOLON)
+            token = Token(TokenType.SEMICOLON, ':')
         elif c == ',':
-            token = Token(TokenType.COMMA)
+            token = Token(TokenType.COMMA, ',')
         elif c == '{':
-            token = Token(TokenType.OPEN_GROUP)
+            token = Token(TokenType.OPEN_GROUP, '{')
         elif c == '}':
-            token = Token(TokenType.CLOSE_GROUP)
+            token = Token(TokenType.CLOSE_GROUP, '}')
         elif c == '[':
-            token = Token(TokenType.OPEN_BRACE)
+            token = Token(TokenType.OPEN_BRACE, '[')
         elif c == ']':
-            token = Token(TokenType.CLOSE_BRACE)
+            token = Token(TokenType.CLOSE_BRACE, ']')
         elif c == '(':
-            token = Token(TokenType.OPEN_TUPLE)
+            token = Token(TokenType.OPEN_TUPLE, '(')
         elif c == ')':
-            token = Token(TokenType.CLOSE_TUPLE)
+            token = Token(TokenType.CLOSE_TUPLE, ')')
         if token is not None:
             # move to next
             self.char_reader.read()
         return token
 
 
-class Tokenizer:
+class TokensAnalyzer:
+    @staticmethod
+    def open_close_idx(open_type, close_type, token_reader):
+        """
+        :param token_reader:
+        :type token_reader TokenReader
+        :return:
+        """
+        logger = logging.getLogger(__name__)
+        pos = token_reader.tell()
+        while token_reader.current_token is not None and token_reader.current_token.type != open_type:
+            token = token_reader.read()
+        open_idx = -1
+        close_idx = -1
+        opened = 0
+        if token_reader.current_token is not None and token_reader.current_token.type == open_type:
+            open_idx = token_reader.tell()
+            opened = 1
+            logger.debug("[{}] {} opened={}".format(token_reader.tell(), open_type, opened))
+            token_reader.read()
+        while token_reader.current_token is not None and opened != 0:
+            if token_reader.current_token.type == close_type:
+                opened -= 1
+                logger.debug("[{}] {} opened={}".format(token_reader.tell(), token_reader.current_token.type, opened))
+                if opened == 0:
+                    # because ignore read next token before break
+                    close_idx = token_reader.tell()
+                    break
+            if token_reader.current_token.type == open_type:
+                opened += 1
+                logger.debug("[{}] {} opened={}".format(token_reader.tell(), token_reader.current_token.type, opened))
+            token_reader.read()
+        # restore position before return
+        token_reader.seek(pos)
+        return open_idx, close_idx
+
+
+class TokensExtractor:
     def __init__(self, char_reader):
         self.char_reader = char_reader
         hash_token_parser = HashTokenParser(char_reader)
@@ -304,7 +342,7 @@ class Tokenizer:
     def _get_next_token(self):
         return self.head_parser.parse_next_token()
 
-    def tokenize(self):
+    def extract_tokens(self):
         token = self._get_next_token()
         while token is not None:
             self.tokens.append(token)
@@ -321,7 +359,7 @@ class TokenReader:
 
     def seek(self, pos):
         self.pos = pos
-        self.current_token = self.tokens[self.pos] if len(self.tokens) < pos else None
+        self.current_token = self.tokens[self.pos] if len(self.tokens) > pos else None
 
     def tell(self):
         return self.pos
@@ -344,25 +382,29 @@ class EntityPairParser:
         super().__init__()
         self.token_reader = token_reader
         self.next_parser = None
+        self.logger = logging.getLogger(__name__)
 
     def _extract_key(self):
-        key = ""
-        token = self.token_reader.current_token
-        while token is not None and token.type != TokenType.SEMICOLON:
-            key += str(token.value) if token.value is not None else ""
-            token = self.token_reader.read()
-        if token is not None and token.type == TokenType.SEMICOLON:
+        key = []
+        # alias for less typing
+        tr = self.token_reader
+        while tr.current_token is not None and tr.current_token.type != TokenType.SEMICOLON:
+            if tr.current_token.value is not None:
+                key.append(str(tr.current_token.value))
+            self.token_reader.read()
+        if tr.current_token is not None and tr.current_token.type == TokenType.SEMICOLON:
             # going to next after semicolon token
             self.token_reader.read()
-        return key
+        return " ".join(key)
 
     def _extract_value(self):
         value = ""
-        token = self.token_reader.current_token
-        while token is not None and token.type != TokenType.EOL:
-            value += str(token.value) if token.value is not None else ""
-            token = self.token_reader.read()
-        if token is not None and token.type == TokenType.EOL:
+        # alias for less typing
+        tr = self.token_reader
+        while tr.current_token is not None and tr.current_token.type != TokenType.EOL:
+            value += str(tr.current_token.value) if tr.current_token.value is not None else ""
+            self.token_reader.read()
+        if tr.current_token is not None and tr.current_token.type == TokenType.EOL:
             # going to next after EOL token
             self.token_reader.read()
         return value
@@ -378,9 +420,13 @@ class EntityPairParser:
 
     def parse_next_entity(self):
         parser = self
+        pos = self.token_reader.tell()
         while parser is not None:
+            self.token_reader.seek(pos)
             entity = parser._try_parse_next_entity()
             if entity is not None:
+                if self.logger.isEnabledFor(logging.DEBUG):
+                    self.logger.debug("entity: {}", entity)
                 return entity
             else:
                 parser = parser.next_parser
@@ -392,24 +438,26 @@ class StringArrayParser(EntityPairParser):
         super().__init__(token_reader)
 
     def _extract_values(self):
-        token = self.token_reader.current_token
-        if token is None:
+        tr = self.token_reader
+        if tr.current_token is None:
             return None
         opening_token_types = [TokenType.OPEN_TUPLE, TokenType.OPEN_BRACE, TokenType.OPEN_GROUP]
         closing_token_types = [TokenType.CLOSE_TUPLE, TokenType.CLOSE_BRACE, TokenType.CLOSE_GROUP]
         values = None
-        if token.type in opening_token_types:
+        if tr.current_token.type in opening_token_types:
             values = []
-            idx_opening_token_type = opening_token_types.index(token.type)
-            while token is not None and token.type != closing_token_types[idx_opening_token_type]:
+            idx_opening_token_type = opening_token_types.index(tr.current_token.type)
+            while tr.current_token is not None and tr.current_token.type != closing_token_types[idx_opening_token_type]:
                 # does not expect separate tokens described one entity
-                if token.type == TokenType.STRING \
-                        or token.type == TokenType.NUMBER \
-                        or token.type == TokenType.TRUE \
-                        or token.type == TokenType.FALSE \
-                        or token.type == TokenType.NULL:
-                    values.append(token.value)
-                token = self.token_reader.read()
+                if tr.current_token.type == TokenType.STRING \
+                        or tr.current_token.type == TokenType.NUMBER \
+                        or tr.current_token.type == TokenType.TRUE \
+                        or tr.current_token.type == TokenType.FALSE \
+                        or tr.current_token.type == TokenType.NULL:
+                    values.append(tr.current_token.value)
+                self.token_reader.read()
+            # going to next after closing token
+            self.token_reader.read()
         return values
 
     def _try_parse_next_entity(self):
@@ -442,23 +490,41 @@ class ObjectIdentifierParser(StringArrayParser):
         ]
 
 
-class Entitynizer:
+class PairsExtractor:
 
     def __init__(self, tokens):
-        token_reader = TokenReader(tokens)
+        self.token_reader = TokenReader(tokens)
 
         # this settings can be encapsulated into Entitinizer?
-        any_pair_parser = EntityPairParser(token_reader)
-        array_parser = StringArrayParser(token_reader)
-        object_identifier_parser = ObjectIdentifierParser(token_reader)
+        any_pair_parser = EntityPairParser(self.token_reader)
+        array_parser = StringArrayParser(self.token_reader)
+        object_identifier_parser = ObjectIdentifierParser(self.token_reader)
         object_identifier_parser.next_parser = array_parser
         array_parser.next_parser = any_pair_parser
         self._head_parser = object_identifier_parser
         self._entities = []
 
-    def entitynize(self):
+    def __find_begin_pairs_container(self):
+        # find beginning of pairs container
+        token = self.token_reader.current_token
+        while token is not None and token.type != TokenType.OPEN_GROUP:
+            token = self.token_reader.read()
+        found = True if token is not None and token.type == TokenType.OPEN_GROUP else False
+        if found:
+            # going to next token
+            self.token_reader.read()
+        return found
+
+    def extract_pairs(self):
+        self._entities = []
+        open_idx, close_idx = TokensAnalyzer.open_close_idx(TokenType.OPEN_GROUP,
+                                                            TokenType.CLOSE_GROUP,
+                                                            self.token_reader)
+        if open_idx == -1 or close_idx == -1:
+            return self._entities
+        self.token_reader.seek(open_idx + 1)
         entities = self._head_parser.parse_next_entity()
-        while entities is not None:
+        while entities is not None and self.token_reader.tell() <= close_idx:
             for entity in entities:
                 self._entities.append(entity)
             entities = self._head_parser.parse_next_entity()
@@ -471,18 +537,20 @@ class BACnetParser:
 
     def parse_bacrpm(self, text):
         char_reader = CharReader(text)
-        tokenizer = Tokenizer(char_reader)
-        tokens = tokenizer.tokenize()
+        tokens_extractor = TokensExtractor(char_reader)
+        tokens = tokens_extractor.extract_tokens()
+
         if self.logger.isEnabledFor(logging.DEBUG):
             idx = 0
             for token in tokens:
                 self.logger.debug("[{}] {}".format(idx, token))
-        entitynizer = Entitynizer(tokens)
-        entities = entitynizer.entitynize()
+
+        pairs_extractor = PairsExtractor(tokens)
+        pairs = pairs_extractor.extract_pairs()
         bacnet_object = {}
-        for entity in entities:
+        for entity in pairs:
             name = entity[0]
             value = entity[1]
-            if name in bacnet.property.map:
-                bacnet_object[bacnet.property.map[name]] = value
+            if name in bacnet_property.name_map:
+                bacnet_object[bacnet_property.name_map[name]] = value
         return bacnet_object

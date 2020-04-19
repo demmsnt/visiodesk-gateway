@@ -1,4 +1,4 @@
-map = {
+name_map = {
     "acked-transitions": "0",
     "ack-required": "1",
     "action": "2",
