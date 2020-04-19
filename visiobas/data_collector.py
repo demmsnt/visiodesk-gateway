@@ -6,7 +6,7 @@ import time
 import visiobas.visiobas_logging
 from visiobas.gate_client import VisiobasGateClient
 import bacnet.config
-from bacnet.bacnet_property import ObjectProperty
+from bacnet.bacnet import ObjectProperty
 
 
 class VisiobasTransmitter(Thread):

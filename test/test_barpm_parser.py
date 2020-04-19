@@ -3,7 +3,7 @@ import unittest
 import visiobas.visiobas_logging
 import logging
 from bacnet.parser import BACnetParser
-from bacnet.bacnet_property import bacnet_name_map
+from bacnet.bacnet import bacnet_name_map
 
 
 class BACnetParserTest(unittest.TestCase):

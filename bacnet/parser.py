@@ -1,7 +1,7 @@
 import enum
 import math
 import logging
-from bacnet.bacnet_property import bacnet_name_map
+from bacnet.bacnet import bacnet_name_map
 
 
 class TokenType(enum.Enum):

@@ -715,3 +715,45 @@ class ObjectProperty(enum.Enum):
 
     def id(self):
         return self.value
+
+
+class ObjectType(enum.Enum):
+    ANALOG_INPUT = "analog-input", 0
+    ANALOG_OUTPUT = "analog-output", 1
+    ANALOG_VALUE = "analog-value", 2
+    BINARY_INPUT = "binary-input", 3
+    BINARY_OUTPUT = "binary-output", 4
+    BINARY_VALUE = "binary-value", 5
+    DEVICE = "device", 8
+    CALENDAR = "calendar", 6
+    COMMAND = "command", 7
+    EVENT_ENROLLMENT = "event-enrollment", 9
+    FILE = "file", 10
+    GROUP = "group", 11
+    LOOP = "loop", 12
+    MULTI_STATE_INPUT = "multi-state-input", 13
+    NOTIFICATION_CLASS = "notification-class", 15
+    MULTI_STATE_OUTPUT = "multi-state-output", 14
+    PROGRAM = "program", 16
+    SCHEDULE = "schedule", 17
+    AVERAGING = "averaging", 18
+    MULTI_STATE_VALUE = "multi-state-value", 19
+    ACCUMULATOR = "accumulator", 23
+    TREND_LOG = "trend-log", 20
+    LIFE_SAFETY_POINT = "life-safety-point", 21
+    LIFE_SAFETY_ZONE = "life-safety-zone", 22
+    PULSE_CONVERTER = "pulse-converter", 24
+    ACCESS_POINT = "access-point", 33
+    SITE = "site", -1
+    FOLDER = "folder", -1
+    TRUNK = "trunk", -1
+    GRAPHIC = "graphic", -1
+
+    def id(self):
+        return self.value[0]
+
+    def name(self):
+        return self.value[0]
+
+    def code(self):
+        return self.value[1]
