@@ -1,7 +1,7 @@
 import enum
 import math
 import logging
-from bacnet import bacnet_property
+from bacnet.bacnet_property import bacnet_name_map
 
 
 class TokenType(enum.Enum):
@@ -426,7 +426,7 @@ class EntityPairParser:
             entity = parser._try_parse_next_entity()
             if entity is not None:
                 if self.logger.isEnabledFor(logging.DEBUG):
-                    self.logger.debug("entity: {}", entity)
+                    self.logger.debug("entity: {}".format(entity))
                 return entity
             else:
                 parser = parser.next_parser
@@ -551,6 +551,6 @@ class BACnetParser:
         for entity in pairs:
             name = entity[0]
             value = entity[1]
-            if name in bacnet_property.name_map:
-                bacnet_object[bacnet_property.name_map[name]] = value
+            if name in bacnet_name_map:
+                bacnet_object[bacnet_name_map[name]] = value
         return bacnet_object

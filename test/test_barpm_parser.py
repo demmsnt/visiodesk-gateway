@@ -3,6 +3,7 @@ import unittest
 import visiobas.logging
 import logging
 from bacnet.parser import BACnetParser
+from bacnet.bacnet_property import bacnet_name_map
 
 
 class BACnetParserTest(unittest.TestCase):
@@ -17,8 +18,10 @@ class BACnetParserTest(unittest.TestCase):
             text = file.read()
             self.logger.debug("{} content:\n{}".format(path, text))
             parser = BACnetParser()
-            objects = parser.parse_bacrpm(text)
-            self.assertTrue(objects is not None)
+            object = parser.parse_bacrpm(text)
+            self.assertTrue(object is not None)
+            self.assertTrue(object[bacnet_name_map["object-identifier"]], 3000022)
+            self.assertTrue(object[bacnet_name_map["object-type"]], "analog-input")
 
 
 if __name__ == '__main__':
