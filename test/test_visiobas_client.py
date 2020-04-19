@@ -2,7 +2,7 @@ import unittest
 from visiobas.client import VisiobasClient
 from visiobas.gate_client import VisiobasGateClient
 from visiobas.object_type import ObjectType
-from visiobas.property import ObjectProperty
+from bacnet.bacnet_property import ObjectProperty
 import visiobas.logging
 from random import randrange
 
