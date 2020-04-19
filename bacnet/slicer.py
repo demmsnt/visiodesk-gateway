@@ -1,32 +1,33 @@
 from subprocess import Popen, PIPE
 from bacnet.parser import BACnetParser
 import logging
+from pathlib import Path
 
 
 class BACrpmSlicer:
-    def __init__(self, bacrpm_app_path, data_consumer):
+    def __init__(self, bacrpm_app_path):
         """
         :param bacrpm_app_path:
-        :param data_consumer:
-        :type data_consumer function - callback function with sliced data
         """
         self.bacrpm_app_path = bacrpm_app_path
-        self.data_consumer = data_consumer
         self.parser = BACnetParser()
         self.logger = logging.getLogger(__name__)
 
     def execute(self):
+        path = Path(self.bacrpm_app_path)
+        cwd = path.parent
         if self.logger.isEnabledFor(logging.DEBUG):
-            self.logger.debug("execute {}".format(self.bacrpm_app_path))
-
-        process = Popen([self.bacrpm_app_path], stdout=PIPE)
+            self.logger.debug("execute: {} cwd: {}".format(self.bacrpm_app_path, cwd))
+        process = Popen([self.bacrpm_app_path], stdout=PIPE, cwd=str(cwd), text=True)
         (output, err) = process.communicate()
         exit_code = process.wait()
-
+        # output = str(output)
         if self.logger.isEnabledFor(logging.DEBUG):
             self.logger.debug("bacrpm output:\n{}".format(output))
+            self.logger.debug("exit code: {}".format(exit_code))
 
         try:
-            self.data_consumer(self.parser.parse_bacrpm(output))
-        except:
-            self.logger.error("Failed parse bacrpm output:\n{}".format(output))
+            return self.parser.parse_bacrpm(output)
+        except Exception as e:
+            self.logger.error("Failed parse bacrpm: {}".format(e))
+            self.logger.error("Failed parser: {}".format(output))

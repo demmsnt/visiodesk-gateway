@@ -3,7 +3,7 @@ from visiobas.client import VisiobasClient
 from visiobas.gate_client import VisiobasGateClient
 from visiobas.object_type import ObjectType
 from bacnet.bacnet_property import ObjectProperty
-import visiobas.logging
+import visiobas.visiobas_logging
 from random import randrange
 
 LOCAL = {
@@ -33,7 +33,7 @@ PWD = SERVER[USING_SERVER]["pwd"]
 
 class TestVisiobasClient(unittest.TestCase):
     def setUp(self):
-        visiobas.logging.initialize_logging()
+        visiobas.visiobas_logging.initialize_logging()
         self.client = VisiobasClient(HOST, PORT, verify=False)
         self.client.rq_login(USER, PWD)
 
@@ -51,7 +51,7 @@ class TestVisiobasClient(unittest.TestCase):
 
 class TestVisiobasGateClient(unittest.TestCase):
     def setUp(self):
-        visiobas.logging.initialize_logging()
+        visiobas.visiobas_logging.initialize_logging()
         self.client = VisiobasGateClient(HOST, PORT, verify=False)
         self.client.rq_login(USER, PWD)
 

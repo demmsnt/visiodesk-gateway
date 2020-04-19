@@ -1,6 +1,6 @@
 import os
 import unittest
-import visiobas.logging
+import visiobas.visiobas_logging
 import logging
 from bacnet.parser import BACnetParser
 from bacnet.bacnet_property import bacnet_name_map
@@ -8,7 +8,7 @@ from bacnet.bacnet_property import bacnet_name_map
 
 class BACnetParserTest(unittest.TestCase):
     def setUp(self):
-        visiobas.logging.initialize_logging()
+        visiobas.visiobas_logging.initialize_logging()
         self.logger = logging.getLogger(__name__)
 
     def test_bacrpm_parser(self):
