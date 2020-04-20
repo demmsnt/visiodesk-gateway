@@ -91,7 +91,7 @@ class VisiobasThreadDataCollector(Thread):
                     transmitter.push_collected_data(data)
             time.sleep(1)
 
-
+# TODO remove main move test into unit test
 if __name__ == '__main__':
     visiobas.visiobas_logging.initialize_logging()
 
