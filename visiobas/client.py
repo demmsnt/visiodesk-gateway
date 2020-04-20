@@ -50,13 +50,19 @@ class VisiobasClient:
     def __request(self, method, url, data=None, headers=None, cookies=None):
         session = self.__get_session()
         if method == 'get':
+            if self.logger.isEnabledFor(logging.DEBUG):
+                self.logger.debug("GET: {}".format(url))
             response = session.get(url, headers=headers, cookies=cookies, auth=self.auth, verify=self.verify)
         elif method == 'post':
+            if self.logger.isEnabledFor(logging.DEBUG):
+                self.logger.debug("POST: {} data: {}".format(url, data))
             response = session.post(url, data, headers=headers, auth=self.auth, verify=self.verify)
         # elif method == 'delete':
         #     response = session.delete(url, headers=headers, auth=self.auth)
         else:
             raise Exception('Unsupported http method: {}'.format(method))
+        if self.logger.isEnabledFor(logging.DEBUG):
+            self.logger.debug("Response: {} data: {}".format(url, response))
         return response
 
     def rq_check_auth_token(self) -> bool:

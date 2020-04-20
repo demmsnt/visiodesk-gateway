@@ -1,2 +1,2 @@
 @echo off
-type resource\bacrpm.txt
+type resource\bacrpm-emulation-test.txt

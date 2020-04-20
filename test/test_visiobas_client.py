@@ -85,7 +85,7 @@ class TestVisiobasGateClient(unittest.TestCase):
             }
             data.append(d)
         self.client.rq_put(device_id, data)
-
+# ERROR 2020-04-19 20:44:09,596 __main__ run      Failed put data: {'79': 'analog-input', '75': 25307.0, '85': '52.13', '846': 200}
 
 if __name__ == '__main__':
     unittest.main()

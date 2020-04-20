@@ -1,0 +1,5 @@
+analog-input #25307
+{
+    object-identifier: (analog-input, 25307)
+    present-value: 55.13
+}

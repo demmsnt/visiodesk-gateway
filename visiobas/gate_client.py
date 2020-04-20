@@ -1,6 +1,7 @@
 from visiobas.client import VisiobasClient
 from visiobas.object_type import ObjectType
 import json
+import logging
 
 
 class VisiobasGateClient(VisiobasClient):
