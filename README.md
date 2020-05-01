@@ -14,6 +14,18 @@ pip freeze > dependencies.txt
 pip install -r dependencies.txt
 </pre>
 
+
+__Create address cache by CLI__  
+execute create_address_cache.py with optional --help to get full cli utility help    
+<pre>
+python ./create_address_cache.py --help
+</pre>
+example of usage (creating address_cache file)  
+<pre>
+python ./create_address_cache.py --devices 200,300
+</pre>
+
+
 __Visiobas Gateway Server (VGS)__  
 default protocol: __JSON-RPC 2.0__
 
