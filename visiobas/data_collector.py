@@ -1,13 +1,19 @@
+import argparse
+import logging
+import traceback
+import time
+from pathlib import Path
+
+import bacnet.config
 from threading import Thread
 from bacnet.slicer import BACrpmSlicer
-import logging
-import bacnet.config
-import time
-import visiobas.visiobas_logging
+from visiobas.object.device import Device
+from visiobas.visiobas_logging import initialize_logging
 from visiobas.gate_client import VisiobasGateClient
 import bacnet.config
 from bacnet.bacnet import ObjectProperty
 from bacnet.bacnet import ObjectType
+from bacnet.parser import BACnetParser
 
 
 class VisiobasTransmitter(Thread):
@@ -95,51 +101,148 @@ class VisiobasThreadDataCollector(Thread):
 
 # TODO remove main move test_visiobas into unit test_visiobas
 if __name__ == '__main__':
-    visiobas.visiobas_logging.initialize_logging()
+    initialize_logging()
+    logger = logging.getLogger(__name__)
 
-    gate_client = VisiobasGateClient(
-        bacnet.config.visiobas_server_host,
-        bacnet.config.visiobas_server_port,
-        verify=True)
-    # describe how to control return value
-    rs = gate_client.rq_login("s.gubarev", "77777")
+    address_cache_path = bacnet.config.address_cache_path
+    if not Path(address_cache_path).is_file():
+        logger.error("File 'address_cache' not found: {}".format(address_cache_path))
+        exit(0)
 
-    transmitter = VisiobasTransmitter(gate_client)
-    transmitter.setDaemon(True)
-    transmitter.start()
+    try:
+        address_cache = Path(address_cache_path).read_text()
+        address_cache_devices = BACnetParser.parse_bacwi(address_cache)
+        device_ids = [x['id'] for x in address_cache_devices]
 
-    data_collector2 = VisiobasThreadDataCollector(transmitter)
-    data_collector2.add_object(200, ObjectType.ANALOG_INPUT.code(), 25307, 5,
-                               object_reference="Site:Blok_A/ITP.AI_25307")
-    data_collector2.add_object(200, ObjectType.ANALOG_INPUT.code(), 25307, 5,
-                               object_reference="Site:Blok_A/ITP.AI_25307")
-    data_collector2.add_object(200, ObjectType.ANALOG_INPUT.code(), 25307, 5,
-                               object_reference="Site:Blok_A/ITP.AI_25307")
-    data_collector2.add_object(200, ObjectType.ANALOG_INPUT.code(), 25307, 5,
-                               object_reference="Site:Blok_A/ITP.AI_25307")
-    data_collector2.add_object(200, ObjectType.ANALOG_INPUT.code(), 25307, 5,
-                               object_reference="Site:Blok_A/ITP.AI_25307")
-    data_collector2.add_object(200, ObjectType.ANALOG_INPUT.code(), 25307, 5,
-                               object_reference="Site:Blok_A/ITP.AI_25307")
-    data_collector2.add_object(200, ObjectType.ANALOG_INPUT.code(), 25307, 5,
-                               object_reference="Site:Blok_A/ITP.AI_25307")
-    data_collector2.start()
-    data_collector2.join()
+        client = VisiobasGateClient(
+            bacnet.config.visiobas_server['host'],
+            bacnet.config.visiobas_server['port'],
+            bacnet.config.visiobas_server['ssl_verify'])
+        try:
+            # how often need to perform login ?
+            client.rq_login(bacnet.config.visiobas_server['auth']['user'],
+                            bacnet.config.visiobas_server['auth']['pwd'])
 
-    data_collector2 = VisiobasThreadDataCollector(transmitter)
-    data_collector2.add_object(200, ObjectType.ANALOG_INPUT.code(), 25307, 5,
-                               object_reference="Site:Blok_A/ITP.AI_25307")
-    data_collector2.add_object(200, ObjectType.ANALOG_INPUT.code(), 25307, 5,
-                               object_reference="Site:Blok_A/ITP.AI_25307")
-    data_collector2.add_object(200, ObjectType.ANALOG_INPUT.code(), 25307, 5,
-                               object_reference="Site:Blok_A/ITP.AI_25307")
-    data_collector2.add_object(200, ObjectType.ANALOG_INPUT.code(), 25307, 5,
-                               object_reference="Site:Blok_A/ITP.AI_25307")
-    data_collector2.add_object(200, ObjectType.ANALOG_INPUT.code(), 25307, 5,
-                               object_reference="Site:Blok_A/ITP.AI_25307")
-    data_collector2.add_object(200, ObjectType.ANALOG_INPUT.code(), 25307, 5,
-                               object_reference="Site:Blok_A/ITP.AI_25307")
-    data_collector2.add_object(200, ObjectType.ANALOG_INPUT.code(), 25307, 5,
-                               object_reference="Site:Blok_A/ITP.AI_25307")
-    data_collector2.start()
-    data_collector2.join()
+            server_devices = client.rq_devices()
+            server_devices = filter(lambda x: x[ObjectProperty.OBJECT_IDENTIFIER.id()] in device_id, server_devices)
+            if not len(device_ids) == len(server_devices):
+                logger.warning("Not all bacwi table devices exist on server")
+                for address_cache_device in address_cache_devices:
+                    device_id = address_cache_device['id']
+                    found = next((x for x in server_devices
+                                  if lambda d: d[ObjectProperty.OBJECT_IDENTIFIER.id()] == device_id), None)
+                    if found is None:
+                        logger.warning("Device not found on server side: {}".format(address_cache_device))
+
+            port_devices = {}
+            # group devices by port value
+            # devices with different port value can be collected independently
+            for address_cache_device in address_cache_devices:
+                device_id = address_cache_device['id']
+                host = address_cache_device['host']
+                port = address_cache_device['port']
+                server_device = next((x for x in server_devices
+                                      if lambda d: d[ObjectProperty.OBJECT_IDENTIFIER.id()] == device_id), None)
+                if server_device is None:
+                    continue
+
+                # verify host and port equals on server device and bacwi device table
+                server_device = Device(server_device)
+                if not host == server_device.get_host():
+                    logger.warning("Server device {} host ({}) not equal with bacwi device host ({})".
+                                   format(server_device.get_id(), server_device.get_host(), host))
+                if not port == server_device.get_port():
+                    logger.warning("Server device {} port ({}) not equal with bacwi device port ({})"
+                                   .format(server_device.get_id(), server_device.get_port(), port))
+
+                if port not in port_devices:
+                    port_devices[port] = []
+                else:
+                    port_devices[port].append(server_device)
+
+            thread_count = len(port_devices)
+
+            transmitter = VisiobasTransmitter(client)
+            transmitter.setDaemon(True)
+            transmitter.start()
+
+            object_types = [
+                ObjectType.ANALOG_INPUT,
+                ObjectType.ANALOG_OUTPUT,
+                ObjectType.ANALOG_VALUE,
+                ObjectType.BINARY_INPUT,
+                ObjectType.BINARY_OUTPUT,
+                ObjectType.BINARY_VALUE,
+                ObjectType.MULTI_STATE_INPUT,
+                ObjectType.MULTI_STATE_OUTPUT,
+                ObjectType.MULTI_STATE_VALUE
+            ]
+
+            collectors = []
+            thread_idx = 1
+            for devices in port_devices:
+                data_collector_objects = []
+                for device in devices:
+                    for object_type in object_types:
+                        objects = client.rq_device_object(device.get_id(), object_type)
+                        if logger.isEnabledFor(logging.DEBUG):
+                            object_ids = [x[ObjectProperty.OBJECT_IDENTIFIER.id()] for x in objects]
+                            logger.debug("Collector thread# {} object: {}".format(thread_idx, object_ids))
+                        data_collector_objects += objects
+
+                collector = VisiobasThreadDataCollector(transmitter)
+                for o in data_collector_objects:
+                    collector.add_object(
+                        o[ObjectProperty.DEVICE_ID.id()],
+                        o[ObjectProperty.OBJECT_TYPE.id()],
+                        o[ObjectProperty.OBJECT_IDENTIFIER.id()],
+                        5,
+                        o[ObjectProperty.OBJECT_PROPERTY_REFERENCE.id()])
+                collector.start()
+                collectors.append(collector)
+                thread_idx += 1
+
+            # wait until all collector stop threads
+            for collector in collectors:
+                collector.join()
+        except BaseException as e:
+            client.rq_logout()
+            raise e
+    except BaseException as e:
+        logger.error(traceback.format_exc())
+
+    # data_collector2 = VisiobasThreadDataCollector(transmitter)
+    # data_collector2.add_object(200, ObjectType.ANALOG_INPUT.code(), 25307, 5,
+    #                            object_reference="Site:Blok_A/ITP.AI_25307")
+    # data_collector2.add_object(200, ObjectType.ANALOG_INPUT.code(), 25307, 5,
+    #                            object_reference="Site:Blok_A/ITP.AI_25307")
+    # data_collector2.add_object(200, ObjectType.ANALOG_INPUT.code(), 25307, 5,
+    #                            object_reference="Site:Blok_A/ITP.AI_25307")
+    # data_collector2.add_object(200, ObjectType.ANALOG_INPUT.code(), 25307, 5,
+    #                            object_reference="Site:Blok_A/ITP.AI_25307")
+    # data_collector2.add_object(200, ObjectType.ANALOG_INPUT.code(), 25307, 5,
+    #                            object_reference="Site:Blok_A/ITP.AI_25307")
+    # data_collector2.add_object(200, ObjectType.ANALOG_INPUT.code(), 25307, 5,
+    #                            object_reference="Site:Blok_A/ITP.AI_25307")
+    # data_collector2.add_object(200, ObjectType.ANALOG_INPUT.code(), 25307, 5,
+    #                            object_reference="Site:Blok_A/ITP.AI_25307")
+    # data_collector2.start()
+    # data_collector2.join()
+    #
+    # data_collector2 = VisiobasThreadDataCollector(transmitter)
+    # data_collector2.add_object(200, ObjectType.ANALOG_INPUT.code(), 25307, 5,
+    #                            object_reference="Site:Blok_A/ITP.AI_25307")
+    # data_collector2.add_object(200, ObjectType.ANALOG_INPUT.code(), 25307, 5,
+    #                            object_reference="Site:Blok_A/ITP.AI_25307")
+    # data_collector2.add_object(200, ObjectType.ANALOG_INPUT.code(), 25307, 5,
+    #                            object_reference="Site:Blok_A/ITP.AI_25307")
+    # data_collector2.add_object(200, ObjectType.ANALOG_INPUT.code(), 25307, 5,
+    #                            object_reference="Site:Blok_A/ITP.AI_25307")
+    # data_collector2.add_object(200, ObjectType.ANALOG_INPUT.code(), 25307, 5,
+    #                            object_reference="Site:Blok_A/ITP.AI_25307")
+    # data_collector2.add_object(200, ObjectType.ANALOG_INPUT.code(), 25307, 5,
+    #                            object_reference="Site:Blok_A/ITP.AI_25307")
+    # data_collector2.add_object(200, ObjectType.ANALOG_INPUT.code(), 25307, 5,
+    #                            object_reference="Site:Blok_A/ITP.AI_25307")
+    # data_collector2.start()
+    # data_collector2.join()

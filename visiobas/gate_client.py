@@ -36,16 +36,16 @@ class VisiobasGateClient(VisiobasClient):
         url = "{}/vbas/gate/get/{}/empty".format(self.get_addr(), device_id)
         return self.get(url)
 
-    def rq_device_object(self, device_id, object_id):
+    def rq_device_object(self, device_id, object_type):
         """
         Request object
         :param device_id: device id
         :type device_id: int
-        :param object_id: one of supported object type
-        :type object_id: visiobas_object_type.ObjectType
+        :param object_type: one of supported object type
+        :type object_type: visiobas_object_type.ObjectType
         :return:
         """
-        url = "{}/vbas/gate/get/{}/{}".format(self.get_addr(), device_id, object_id.id())
+        url = "{}/vbas/gate/get/{}/{}".format(self.get_addr(), device_id, object_type.id())
         return self.get(url)
 
     def rq_put(self, device_id, data):
