@@ -86,7 +86,7 @@ class VisiobasClient:
         Request login and keep login token and user_id\n
         :param login: plain text login
         :type login: str
-        :param password: plain text password
+        :param password: md5 hashed password
         :type password: str
         :return: 'token' and 'user_id'
         """
@@ -94,7 +94,7 @@ class VisiobasClient:
         url = "{}/auth/rest/login".format(self.get_addr())
         data = json.dumps({
             "login": login,
-            "password": hashlib.md5(password.encode()).hexdigest()
+            "password": password
         })
         # js = {
         #     "login": login,

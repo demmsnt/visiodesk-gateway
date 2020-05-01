@@ -37,7 +37,7 @@ class BACnetWriter:
         return "\n".join(lines)
 
     @staticmethod
-    def write_bacwi(self, devices, path):
+    def write_bacwi(devices, path):
         text = BACnetWriter.create_bacwi(devices)
         f = open(path, "+w")
         f.write(text)

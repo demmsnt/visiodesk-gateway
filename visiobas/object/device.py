@@ -1,26 +1,21 @@
 import json
 
 from bacnet.bacnet import ObjectProperty
+from visiobas.object.bacnet_object import BACnetObject
 
 
-class Device:
+class Device(BACnetObject):
     def __init__(self, data):
-        self._data = data
+        super().__init__(data)
         self.property_list = None
         self.configuration_files = None
-
-    def __get_property(self, property):
-        try:
-            return self._data[property]
-        except:
-            return None
 
     def get_property_list(self):
         if self.property_list is not None:
             return self.property_list
         else:
             try:
-                self.property_list = json.loads(self.__get_property(ObjectProperty.PROPERTY_LIST.id()))
+                self.property_list = json.loads(self.get(ObjectProperty.PROPERTY_LIST))
                 return self.property_list
             except:
                 return None
@@ -30,7 +25,7 @@ class Device:
             return self.configuration_files
         else:
             try:
-                self.configuration_files = json.loads(self.__get_property(ObjectProperty.CONFIGURATION_FILES.id()))
+                self.configuration_files = json.loads(self.get(ObjectProperty.CONFIGURATION_FILES))
                 return self.configuration_files
             except:
                 return None
@@ -59,3 +54,8 @@ class Device:
         :return: device object
         """
         return Device(json.loads(s))
+
+    def get_apdu(self):
+        default_apdu = 640
+        apdu = self.get(ObjectProperty.APDU_TIMEOUT)
+        return apdu if apdu is not None else default_apdu
