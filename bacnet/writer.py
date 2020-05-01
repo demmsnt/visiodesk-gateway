@@ -1,3 +1,7 @@
+import logging
+import traceback
+
+
 class BACnetWriter:
 
     @staticmethod
@@ -14,26 +18,37 @@ class BACnetWriter:
         ;
         ; Total Devices: 5
         """
+
+        logger = logging.getLogger(__name__)
+
         lines = []
         lines.append(";Device   MAC (hex)            SNET  SADR (hex)           APDU")
         lines.append(";-------- -------------------- ----- -------------------- ----")
+        appended_device_count = 0
         for device in devices:
-            id = device['id']
-            host = device['host'].split(".")
-            port = device['port']
-            mac = "{:02X}:{:02X}:{:02X}:{:02X}:{}:{}".format(int(host[0]), int(host[1]), int(host[2]), int(host[3]),
-                                                             hex(port)[2:4].upper(), hex(port)[4:6].upper())
-            apdu = device['apdu']
-            line = "{:<9} {:<20} {:<5} {:<20} {:<4}".format(
-                device['id'],
-                mac,
-                0,
-                '00',
-                apdu
-            )
-            lines.append(line)
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug("BACwi device {}".format(device))
+            try:
+                id = device['id']
+                host = device['host'].split(".")
+                port = device['port']
+                mac = "{:02X}:{:02X}:{:02X}:{:02X}:{}:{}".format(int(host[0]), int(host[1]), int(host[2]), int(host[3]),
+                                                                 hex(port)[2:4].upper(), hex(port)[4:6].upper())
+                apdu = device['apdu']
+                line = "{:<9} {:<20} {:<5} {:<20} {:<4}".format(
+                    device['id'],
+                    mac,
+                    0,
+                    '00',
+                    apdu
+                )
+                lines.append(line)
+                appended_device_count += 1
+            except BaseException as e:
+                logger.error("Failed append bacwi table row of device: {}".format(device))
+                logger.error(traceback.format_exc())
         lines.append(";")
-        lines.append("; Total Devices: {}".format(len(devices)))
+        lines.append("; Total Devices: {}".format(appended_device_count))
         return "\n".join(lines)
 
     @staticmethod
