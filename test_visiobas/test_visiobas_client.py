@@ -5,31 +5,14 @@ from visiobas.object_type import ObjectType
 from bacnet.bacnet import ObjectProperty
 import visiobas.visiobas_logging
 from random import randrange
-
-LOCAL = {
-    "host": "http://localhost",
-    "port": 8080,
-    "user": "s.gubarev",
-    "pwd": "77777"
-}
-REMOTE = {
-    "host": "https://visiodesk.net",
-    "port": 8443,
-    "user": "canio",
-    "pwd": "canio"
-}
-SERVER = {
-    "local": LOCAL,
-    "remote": REMOTE
-}
+from test_visiobas import test_config
 
 USING_SERVER = "local"
 
-HOST = SERVER[USING_SERVER]["host"]
-PORT = SERVER[USING_SERVER]["port"]
-USER = SERVER[USING_SERVER]["user"]
-PWD = SERVER[USING_SERVER]["pwd"]
-
+HOST = test_config.SERVER[USING_SERVER]["host"]
+PORT = test_config.SERVER[USING_SERVER]["port"]
+USER = test_config.SERVER[USING_SERVER]["user"]
+PWD = test_config.SERVER[USING_SERVER]["pwd"]
 
 class TestVisiobasClient(unittest.TestCase):
     def setUp(self):

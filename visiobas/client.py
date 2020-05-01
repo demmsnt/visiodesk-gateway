@@ -18,6 +18,11 @@ class BearerAuth(AuthBase):
 
 class VisiobasClient:
     def __init__(self, host, port, verify=True):
+        """
+        :param host: server host
+        :param port: server port
+        :param verify: verify ssl certificate
+        """
         self.host = host
         self.port = port
         self.token = None

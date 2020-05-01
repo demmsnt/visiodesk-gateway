@@ -27,6 +27,7 @@ class VisiobasTransmitter(Thread):
             if len(self.collected_data) > 0:
                 data = self.collected_data.pop()
                 # TODO collect batch data into one request group by device id
+                # replace old data
                 request = [data]
                 try:
                     self.gate_client.rq_put(data[ObjectProperty.DEVICE_ID.id()], request)
@@ -91,7 +92,7 @@ class VisiobasThreadDataCollector(Thread):
                     transmitter.push_collected_data(data)
             time.sleep(1)
 
-# TODO remove main move test into unit test
+# TODO remove main move test_visiobas into unit test_visiobas
 if __name__ == '__main__':
     visiobas.visiobas_logging.initialize_logging()
 
@@ -106,7 +107,25 @@ if __name__ == '__main__':
     transmitter.setDaemon(True)
     transmitter.start()
 
-    data_collector = VisiobasThreadDataCollector(transmitter)
-    data_collector.add_object(200, ObjectType.ANALOG_INPUT.code(), 25307, 5, object_reference="Site:Blok_A/ITP.AI_25307")
-    data_collector.start()
-    data_collector.join()
+    data_collector2 = VisiobasThreadDataCollector(transmitter)
+    data_collector2.add_object(200, ObjectType.ANALOG_INPUT.code(), 25307, 5, object_reference="Site:Blok_A/ITP.AI_25307")
+    data_collector2.add_object(200, ObjectType.ANALOG_INPUT.code(), 25307, 5, object_reference="Site:Blok_A/ITP.AI_25307")
+    data_collector2.add_object(200, ObjectType.ANALOG_INPUT.code(), 25307, 5, object_reference="Site:Blok_A/ITP.AI_25307")
+    data_collector2.add_object(200, ObjectType.ANALOG_INPUT.code(), 25307, 5, object_reference="Site:Blok_A/ITP.AI_25307")
+    data_collector2.add_object(200, ObjectType.ANALOG_INPUT.code(), 25307, 5, object_reference="Site:Blok_A/ITP.AI_25307")
+    data_collector2.add_object(200, ObjectType.ANALOG_INPUT.code(), 25307, 5, object_reference="Site:Blok_A/ITP.AI_25307")
+    data_collector2.add_object(200, ObjectType.ANALOG_INPUT.code(), 25307, 5, object_reference="Site:Blok_A/ITP.AI_25307")
+    data_collector2.start()
+    data_collector2.join()
+
+
+    data_collector2 = VisiobasThreadDataCollector(transmitter)
+    data_collector2.add_object(200, ObjectType.ANALOG_INPUT.code(), 25307, 5, object_reference="Site:Blok_A/ITP.AI_25307")
+    data_collector2.add_object(200, ObjectType.ANALOG_INPUT.code(), 25307, 5, object_reference="Site:Blok_A/ITP.AI_25307")
+    data_collector2.add_object(200, ObjectType.ANALOG_INPUT.code(), 25307, 5, object_reference="Site:Blok_A/ITP.AI_25307")
+    data_collector2.add_object(200, ObjectType.ANALOG_INPUT.code(), 25307, 5, object_reference="Site:Blok_A/ITP.AI_25307")
+    data_collector2.add_object(200, ObjectType.ANALOG_INPUT.code(), 25307, 5, object_reference="Site:Blok_A/ITP.AI_25307")
+    data_collector2.add_object(200, ObjectType.ANALOG_INPUT.code(), 25307, 5, object_reference="Site:Blok_A/ITP.AI_25307")
+    data_collector2.add_object(200, ObjectType.ANALOG_INPUT.code(), 25307, 5, object_reference="Site:Blok_A/ITP.AI_25307")
+    data_collector2.start()
+    data_collector2.join()

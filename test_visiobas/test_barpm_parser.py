@@ -13,7 +13,7 @@ class BACnetParserTest(unittest.TestCase):
 
     def test_bacrpm_parser(self):
         path = "{}/resource/bacrpm.txt".format(os.path.dirname(os.path.abspath(__file__)))
-        self.logger.debug("reading test file: {}".format(path))
+        self.logger.debug("reading test_visiobas file: {}".format(path))
         with open(path, "r") as file:
             text = file.read()
             self.logger.debug("{} content:\n{}".format(path, text))
