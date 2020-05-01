@@ -23,6 +23,19 @@ class BACnetParserTest(unittest.TestCase):
             self.assertTrue(object[bacnet_name_map["object-identifier"]], 3000022)
             self.assertTrue(object[bacnet_name_map["object-type"]], "analog-input")
 
+    def test_bacwi_parser(self):
+        path = "{}/resource/address_cache".format(os.path.dirname(os.path.abspath(__file__)))
+        self.logger.debug("reading test file: {}".format(path))
+        with open(path, "r") as file:
+            text = file.read()
+            self.logger.debug("{} content:\n{}".format(path, text))
+            devices = BACnetParser.parse_bacwi(text)
+            self.assertTrue(len(devices) == 5)
+            self.assertTrue(devices[0]["device_id"] == 200)
+            # 0A:15:50:0C:BA:C0
+            self.assertTrue(devices[0]["host"] == "10.21.80.12")
+            self.assertTrue(devices[0]["port"] == 47808)
+
 
 if __name__ == '__main__':
     unittest.main()

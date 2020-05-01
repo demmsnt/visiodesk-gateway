@@ -554,3 +554,46 @@ class BACnetParser:
             if name in bacnet_name_map:
                 bacnet_object[bacnet_name_map[name]] = value
         return bacnet_object
+
+    @staticmethod
+    def parse_bacwi(text):
+        """
+        Parse text file format of address_cache
+        return list of objects with fields: 'device_id', 'host', 'port', 'snet', 'sadr', 'apdu'
+        example of file format
+        ;Device   MAC (hex)            SNET  SADR (hex)           APDU
+        ;-------- -------------------- ----- -------------------- ----
+          200     0A:15:50:0C:BA:C0    0     00                   480
+          300     0A:15:50:0D:BA:C0    0     00                   480
+          400     0A:15:50:0E:BA:C0    0     00                   480
+          500     0A:15:50:0F:BA:C0    0     00                   480
+          600     0A:15:50:10:BA:C0    0     00                   480
+        ;
+        ; Total Devices: 5
+        :return:
+        """
+        devices = []
+        for line in text.split('\n'):
+            trimmed = line.strip()
+            if trimmed.startswith(';'):
+                continue
+            values = trimmed.split()
+            mac = values[1].split(':')
+            host = "{}.{}.{}.{}".format(int(mac[0], 16), int(mac[1], 16), int(mac[2], 16), int(mac[3], 16))
+            port = int(mac[4] + mac[5], 16)
+            device_id = int(values[0])
+            apdu = int(values[4])
+            devices.append({
+                'device_id': device_id,
+                'host': host,
+                'port': port,
+                'snet': 0,
+                'sadr': '0',
+                'apdu': apdu
+            })
+        return devices
+
+    @staticmethod
+    def create_bacwi(self, devices):
+        # TODO implement it
+        pass
