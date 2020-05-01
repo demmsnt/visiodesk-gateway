@@ -6,6 +6,7 @@ from bacnet.bacnet import ObjectProperty
 import visiobas.visiobas_logging
 from random import randrange
 from test_visiobas import test_config
+from visiobas.object.device import Device
 
 USING_SERVER = "local"
 
@@ -13,6 +14,7 @@ HOST = test_config.SERVER[USING_SERVER]["host"]
 PORT = test_config.SERVER[USING_SERVER]["port"]
 USER = test_config.SERVER[USING_SERVER]["user"]
 PWD = test_config.SERVER[USING_SERVER]["pwd"]
+
 
 class TestVisiobasClient(unittest.TestCase):
     def setUp(self):
@@ -46,6 +48,18 @@ class TestVisiobasGateClient(unittest.TestCase):
         self.assertTrue(type(devices) is list)
         self.assertTrue(len(devices) > 0)
 
+    def test_device_configuration_files(self):
+        # test device 200 - expected filled configuration files with host: 127.0.0.1 and port 80
+        devices = self.client.rq_devices()
+        for o in devices:
+            if not o[ObjectProperty.OBJECT_IDENTIFIER.id()] == 200:
+                continue
+            device = Device(o)
+            port = device.get_port()
+            host = device.get_host()
+            self.assertTrue(host == "127.0.0.1")
+            self.assertTrue(port == 80)
+
     def test_rq_device_objects(self):
         objects = self.client.rq_device_objects(200)
         self.assertTrue(objects is not None)
@@ -68,6 +82,8 @@ class TestVisiobasGateClient(unittest.TestCase):
             }
             data.append(d)
         self.client.rq_put(device_id, data)
+
+
 # ERROR 2020-04-19 20:44:09,596 __main__ run      Failed put data: {'79': 'analog-input', '75': 25307.0, '85': '52.13', '846': 200}
 
 if __name__ == '__main__':

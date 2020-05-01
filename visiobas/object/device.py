@@ -20,7 +20,8 @@ class Device:
             return self.property_list
         else:
             try:
-                self.property_list = json.loads(self.__get_property(ObjectProperty.PROPERTY_LIST))
+                self.property_list = json.loads(self.__get_property(ObjectProperty.PROPERTY_LIST.id()))
+                return self.property_list
             except:
                 return None
 
@@ -29,7 +30,8 @@ class Device:
             return self.configuration_files
         else:
             try:
-                self.configuration_files = json.loads(self.__get_property(ObjectProperty.CONFIGURATION_FILES))
+                self.configuration_files = json.loads(self.__get_property(ObjectProperty.CONFIGURATION_FILES.id()))
+                return self.configuration_files
             except:
                 return None
 
