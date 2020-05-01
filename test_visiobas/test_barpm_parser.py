@@ -3,6 +3,7 @@ import unittest
 import visiobas.visiobas_logging
 import logging
 from bacnet.parser import BACnetParser
+from bacnet.writer import BACnetWriter
 from bacnet.bacnet import bacnet_name_map
 
 
@@ -31,11 +32,34 @@ class BACnetParserTest(unittest.TestCase):
             self.logger.debug("{} content:\n{}".format(path, text))
             devices = BACnetParser.parse_bacwi(text)
             self.assertTrue(len(devices) == 5)
-            self.assertTrue(devices[0]["device_id"] == 200)
+            self.assertTrue(devices[0]["id"] == 200)
             # 0A:15:50:0C:BA:C0
             self.assertTrue(devices[0]["host"] == "10.21.80.12")
             self.assertTrue(devices[0]["port"] == 47808)
 
+    def test_bacwi_writer(self):
+        devices = [{
+            "id": 200,
+            "host": "10.21.80.12",
+            "port": 47808,
+            "apdu": 480}]
+        text = BACnetWriter.create_bacwi(devices)
+        self.assertTrue(text is not None)
+        self.assertTrue(len(text) > 0)
+        print(text)
+
+    def test_bacwi_writer_reader(self):
+        devices = [{
+            "id": 200,
+            "host": "10.21.80.12",
+            "port": 47808,
+            "apdu": 480}]
+        text = BACnetWriter.create_bacwi(devices)
+        devices = BACnetParser.parse_bacwi(text)
+        self.assertTrue(len(devices) == 1)
+        self.assertTrue(devices[0]["id"] == 200)
+        self.assertTrue(devices[0]["host"] == "10.21.80.12")
+        self.assertTrue(devices[0]["port"] == 47808)
 
 if __name__ == '__main__':
     unittest.main()

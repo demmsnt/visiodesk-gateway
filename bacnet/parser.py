@@ -559,7 +559,7 @@ class BACnetParser:
     def parse_bacwi(text):
         """
         Parse text file format of address_cache
-        return list of objects with fields: 'device_id', 'host', 'port', 'snet', 'sadr', 'apdu'
+        return list of objects with fields: 'id', 'host', 'port', 'snet', 'sadr', 'apdu'
         example of file format
         ;Device   MAC (hex)            SNET  SADR (hex)           APDU
         ;-------- -------------------- ----- -------------------- ----
@@ -581,10 +581,10 @@ class BACnetParser:
             mac = values[1].split(':')
             host = "{}.{}.{}.{}".format(int(mac[0], 16), int(mac[1], 16), int(mac[2], 16), int(mac[3], 16))
             port = int(mac[4] + mac[5], 16)
-            device_id = int(values[0])
+            id = int(values[0])
             apdu = int(values[4])
             devices.append({
-                'device_id': device_id,
+                'id': id,
                 'host': host,
                 'port': port,
                 'snet': 0,
@@ -592,8 +592,3 @@ class BACnetParser:
                 'apdu': apdu
             })
         return devices
-
-    @staticmethod
-    def create_bacwi(self, devices):
-        # TODO implement it
-        pass
