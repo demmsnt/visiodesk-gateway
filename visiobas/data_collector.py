@@ -15,8 +15,6 @@ from visiobas.object.device import Device
 from visiobas.visiobas_logging import initialize_logging
 
 
-# class FilterBy
-
 class VisiobasTransmitter(Thread):
 
     def __init__(self, gate_client, period: int = 1):
@@ -37,6 +35,11 @@ class VisiobasTransmitter(Thread):
             _id = data[ObjectProperty.OBJECT_IDENTIFIER.id()]
             _device_id = data[ObjectProperty.DEVICE_ID.id()]
             self.collected_data[_id] = data
+            if self.logger.isEnabledFor(logging.DEBUG):
+                self.logger.info("Push id: {}, device: {} collected data size: {}".format(
+                    _id,
+                    _device_id,
+                    len(self.collected_data)))
             if _device_id not in self.device_ids:
                 self.device_ids.append(_device_id)
         except:
@@ -136,11 +139,12 @@ class VisiobasThreadDataCollector(Thread):
                             object_type_code == ObjectType.ANALOG_VALUE.code():
                         data[ObjectProperty.PRESENT_VALUE.id()] = float(data[ObjectProperty.PRESENT_VALUE.id()])
                     data[ObjectProperty.DEVICE_ID.id()] = device_id
+                    # object (data) ready to transmit to server side
                     transmitter.push_collected_data(data)
             time.sleep(self.period)
 
 
-# TODO remove main move test_visiobas into unit test_visiobas
+# entry point of data_collector
 if __name__ == '__main__':
     initialize_logging()
     logger = logging.getLogger('visiobas.data_collector')
@@ -170,9 +174,9 @@ if __name__ == '__main__':
             if not len(device_ids) == len(server_devices):
                 logger.warning("Not all bacwi table devices exist on server")
                 for address_cache_device in address_cache_devices:
-                    device_id = address_cache_device['id']
+                    _device_id = address_cache_device['id']
                     found = next((x for x in server_devices
-                                  if lambda d: d[ObjectProperty.OBJECT_IDENTIFIER.id()] == device_id), None)
+                                  if lambda d: d[ObjectProperty.OBJECT_IDENTIFIER.id()] == _device_id), None)
                     if found is None:
                         logger.warning("Device not found on server side: {}".format(address_cache_device))
 
@@ -180,11 +184,16 @@ if __name__ == '__main__':
             # group devices by port value
             # devices with different port value can be collected independently
             for address_cache_device in address_cache_devices:
-                device_id = address_cache_device['id']
+                _device_id = address_cache_device['id']
                 host = address_cache_device['host']
                 port = address_cache_device['port']
-                server_device = next((x for x in server_devices
-                                      if lambda d: d[ObjectProperty.OBJECT_IDENTIFIER.id()] == device_id), None)
+                server_device = None
+                for device in server_devices:
+                    if device[ObjectProperty.OBJECT_IDENTIFIER.id()] == _device_id:
+                        server_device = device
+                        break
+                # server_device = next((x for x in server_devices
+                #                       if lambda d: d[ObjectProperty.OBJECT_IDENTIFIER.id()] == _device_id), None)
                 if server_device is None:
                     continue
 
@@ -244,12 +253,18 @@ if __name__ == '__main__':
 
                 collector = VisiobasThreadDataCollector(transmitter)
                 for o in data_collector_objects:
+                    _device_id = o[ObjectProperty.DEVICE_ID.id()]
+                    _id = o[ObjectProperty.OBJECT_IDENTIFIER.id()]
+                    _type_code = ObjectType.name_to_code(o[ObjectProperty.OBJECT_TYPE.id()])
+                    _period = 5
+                    _reference = o[ObjectProperty.OBJECT_PROPERTY_REFERENCE.id()]
+
                     collector.add_object(
-                        o[ObjectProperty.DEVICE_ID.id()],
-                        o[ObjectProperty.OBJECT_TYPE.id()],
-                        o[ObjectProperty.OBJECT_IDENTIFIER.id()],
-                        5,
-                        o[ObjectProperty.OBJECT_PROPERTY_REFERENCE.id()])
+                        _device_id,
+                        _type_code,
+                        _id,
+                        _period,
+                        _reference)
                 collector.start()
                 collectors.append(collector)
                 thread_idx += 1
@@ -260,41 +275,5 @@ if __name__ == '__main__':
         except BaseException as e:
             client.rq_logout()
             raise e
-    except BaseException as e:
+    except:
         logger.error(traceback.format_exc())
-
-    # data_collector2 = VisiobasThreadDataCollector(transmitter)
-    # data_collector2.add_object(200, ObjectType.ANALOG_INPUT.code(), 25307, 5,
-    #                            object_reference="Site:Blok_A/ITP.AI_25307")
-    # data_collector2.add_object(200, ObjectType.ANALOG_INPUT.code(), 25307, 5,
-    #                            object_reference="Site:Blok_A/ITP.AI_25307")
-    # data_collector2.add_object(200, ObjectType.ANALOG_INPUT.code(), 25307, 5,
-    #                            object_reference="Site:Blok_A/ITP.AI_25307")
-    # data_collector2.add_object(200, ObjectType.ANALOG_INPUT.code(), 25307, 5,
-    #                            object_reference="Site:Blok_A/ITP.AI_25307")
-    # data_collector2.add_object(200, ObjectType.ANALOG_INPUT.code(), 25307, 5,
-    #                            object_reference="Site:Blok_A/ITP.AI_25307")
-    # data_collector2.add_object(200, ObjectType.ANALOG_INPUT.code(), 25307, 5,
-    #                            object_reference="Site:Blok_A/ITP.AI_25307")
-    # data_collector2.add_object(200, ObjectType.ANALOG_INPUT.code(), 25307, 5,
-    #                            object_reference="Site:Blok_A/ITP.AI_25307")
-    # data_collector2.start()
-    # data_collector2.join()
-    #
-    # data_collector2 = VisiobasThreadDataCollector(transmitter)
-    # data_collector2.add_object(200, ObjectType.ANALOG_INPUT.code(), 25307, 5,
-    #                            object_reference="Site:Blok_A/ITP.AI_25307")
-    # data_collector2.add_object(200, ObjectType.ANALOG_INPUT.code(), 25307, 5,
-    #                            object_reference="Site:Blok_A/ITP.AI_25307")
-    # data_collector2.add_object(200, ObjectType.ANALOG_INPUT.code(), 25307, 5,
-    #                            object_reference="Site:Blok_A/ITP.AI_25307")
-    # data_collector2.add_object(200, ObjectType.ANALOG_INPUT.code(), 25307, 5,
-    #                            object_reference="Site:Blok_A/ITP.AI_25307")
-    # data_collector2.add_object(200, ObjectType.ANALOG_INPUT.code(), 25307, 5,
-    #                            object_reference="Site:Blok_A/ITP.AI_25307")
-    # data_collector2.add_object(200, ObjectType.ANALOG_INPUT.code(), 25307, 5,
-    #                            object_reference="Site:Blok_A/ITP.AI_25307")
-    # data_collector2.add_object(200, ObjectType.ANALOG_INPUT.code(), 25307, 5,
-    #                            object_reference="Site:Blok_A/ITP.AI_25307")
-    # data_collector2.start()
-    # data_collector2.join()

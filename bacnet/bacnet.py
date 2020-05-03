@@ -757,3 +757,10 @@ class ObjectType(enum.Enum):
 
     def code(self):
         return self.value[1]
+
+    @staticmethod
+    def name_to_code(name):
+        for _type in ObjectType:
+            if _type.name() == name:
+                return _type.code()
+        return None
