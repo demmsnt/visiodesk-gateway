@@ -5,7 +5,7 @@ from pathlib import Path
 
 
 class BACrpmSlicer:
-    def __init__(self, bacrpm_app_path):
+    def __init__(self, bacrpm_app_path: Path):
         """
         :param bacrpm_app_path:
         """
@@ -13,11 +13,11 @@ class BACrpmSlicer:
         self.parser = BACnetParser()
         self.logger = logging.getLogger(__name__)
 
-    def execute(self, device_id, object_type_code, object_id, fields):
+    def execute(self, device_id: int, object_type_code: int, object_id: int, fields: list):
         path = Path(self.bacrpm_app_path)
         cwd = path.parent
         command = " ".join([
-            self.bacrpm_app_path,
+            str(self.bacrpm_app_path),
             str(device_id),
             str(object_type_code),
             str(object_id),
