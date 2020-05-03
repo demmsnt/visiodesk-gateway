@@ -245,21 +245,24 @@ if __name__ == '__main__':
             collectors = []
             thread_idx = 1
             for port in port_devices:
-                devices = port_devices[port]
+                _devices = port_devices[port]
                 data_collector_objects = []
-                for device in devices:
+                for device in _devices:
                     for object_type in object_types:
                         objects = client.rq_device_object(device.get_id(), object_type)
                         if logger.isEnabledFor(logging.DEBUG):
                             object_ids = [x[ObjectProperty.OBJECT_IDENTIFIER.id()] for x in objects]
                             logger.debug(
-                                "Collector thread# {} device: {} type: {} objects: {}".format(thread_idx,
+                                "Collector# {} device: {} type: {} objects: {}".format(thread_idx,
                                                                                               device.get_id(),
                                                                                               object_type,
                                                                                               object_ids))
                         data_collector_objects += objects
 
                 collector = VisiobasThreadDataCollector(thread_idx, transmitter)
+                if logger.isEnabledFor(logging.INFO):
+                    _device_ids = [x.get_id() for x in _devices]
+                    logger.info("Collector# {} collect devices: {}".format(thread_idx, _device_ids))
                 for o in data_collector_objects:
                     _device_id = o[ObjectProperty.DEVICE_ID.id()]
                     _id = o[ObjectProperty.OBJECT_IDENTIFIER.id()]
