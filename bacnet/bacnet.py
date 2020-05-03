@@ -764,3 +764,10 @@ class ObjectType(enum.Enum):
             if _type.name() == name:
                 return _type.code()
         return None
+
+    @staticmethod
+    def code_to_name(code):
+        for _type in ObjectType:
+            if _type.code() == code:
+                return _type.name()
+        return None

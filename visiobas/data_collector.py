@@ -29,6 +29,15 @@ class VisiobasTransmitter(Thread):
         self.gate_client = gate_client
         self.period = period
         self.logger = logging.getLogger('visiobas.data_collector.transmitter')
+        self.send_fields = [
+            ObjectProperty.OBJECT_TYPE.id(),
+            ObjectProperty.OBJECT_IDENTIFIER.id(),
+            ObjectProperty.OBJECT_PROPERTY_REFERENCE.id(),
+            ObjectProperty.PRESENT_VALUE.id(),
+            ObjectProperty.STATUS_FLAGS.id(),
+            ObjectProperty.PRIORITY_ARRAY.id()
+        ]
+
         # how many data was send by statistic period
         self.statistic_send_object_count = 0
         self.statistic_log_period = 10
@@ -72,7 +81,12 @@ class VisiobasTransmitter(Thread):
                 _objects = []
                 for _id in object_ids_group_by_device:
                     try:
-                        _objects.append(self.collected_data.pop(_id))
+                        _bacnet_object = self.collected_data.pop(_id)
+                        # send only necessary fields
+                        _data = {}
+                        for field in self.send_fields:
+                            _data[field] = _bacnet_object[field]
+                        _objects.append(_data)
                     except:
                         self.logger.error(traceback.format_exc())
                 request = _objects
@@ -117,38 +131,49 @@ class VisiobasThreadDataCollector(Thread):
         while True:
             slicer = BACrpmSlicer(bacnet.config.bacrmp_app_path)
             now = time.time()
-            for object in self.objects:
-                time_last_success_slice = object["time_last_success_slice"]
-                slice_period = object["slice_period"]
-                device_id = object["device_id"]
-                object_type_code = object["object_type_code"]
-                object_id = object["object_id"]
-                object_reference = object["object_reference"]
-                fields = [
-                    ObjectProperty.OBJECT_IDENTIFIER.id(),
-                    ObjectProperty.OBJECT_PROPERTY_REFERENCE.id(),
-                    ObjectProperty.OBJECT_TYPE.id(),
-                    ObjectProperty.OUT_OF_SERVICE.id(),
-                    ObjectProperty.PRESENT_VALUE.id(),
-                    ObjectProperty.RELIABILITY.id(),
-                    ObjectProperty.STATUS_FLAGS.id(),
-                    ObjectProperty.SYSTEM_STATUS.id()
-                ]
-                if now - time_last_success_slice > slice_period:
-                    data = slicer.execute(device_id, object_type_code, object_id, fields)
-                    object["time_last_success_slice"] = time.time()
-                    # prepare collected data and store to be transmitted to server
-                    if object_reference is not None:
-                        data[ObjectProperty.OBJECT_PROPERTY_REFERENCE.id()] = object_reference
-                    if ObjectProperty.OBJECT_IDENTIFIER.id() in data:
-                        data[ObjectProperty.OBJECT_IDENTIFIER.id()] = int(data[ObjectProperty.OBJECT_IDENTIFIER.id()])
-                    if object_type_code == ObjectType.ANALOG_INPUT.code() or \
-                            object_type_code == ObjectType.ANALOG_OUTPUT.code() or \
-                            object_type_code == ObjectType.ANALOG_VALUE.code():
-                        data[ObjectProperty.PRESENT_VALUE.id()] = float(data[ObjectProperty.PRESENT_VALUE.id()])
-                    data[ObjectProperty.DEVICE_ID.id()] = device_id
-                    # object (data) ready to transmit to server side
-                    transmitter.push_collected_data(data)
+            for _object in self.objects:
+                try:
+                    time_last_success_slice = _object["time_last_success_slice"]
+                    slice_period = _object["slice_period"]
+                    device_id = _object["device_id"]
+                    object_type_code = _object["object_type_code"]
+                    object_id = _object["object_id"]
+                    object_reference = _object["object_reference"]
+                    fields = [
+                        # ObjectProperty.OBJECT_IDENTIFIER.id(),
+                        # ObjectProperty.OBJECT_PROPERTY_REFERENCE.id(),
+                        # ObjectProperty.OBJECT_TYPE.id(),
+                        ObjectProperty.OUT_OF_SERVICE.id(),
+                        ObjectProperty.PRESENT_VALUE.id(),
+                        ObjectProperty.RELIABILITY.id(),
+                        ObjectProperty.STATUS_FLAGS.id(),
+                        ObjectProperty.PRIORITY_ARRAY.id()
+                        # ObjectProperty.SYSTEM_STATUS.id()
+                    ]
+                    if now - time_last_success_slice > slice_period:
+                        data = slicer.execute(device_id, object_type_code, object_id, fields)
+                        _object["time_last_success_slice"] = time.time()
+                        # prepare collected data and store to be transmitted to server
+                        if object_reference is not None:
+                            data[ObjectProperty.OBJECT_PROPERTY_REFERENCE.id()] = object_reference
+                        # convert present value to float
+                        if object_type_code == ObjectType.ANALOG_INPUT.code() or \
+                                object_type_code == ObjectType.ANALOG_OUTPUT.code() or \
+                                object_type_code == ObjectType.ANALOG_VALUE.code():
+                            data[ObjectProperty.PRESENT_VALUE.id()] = float(data[ObjectProperty.PRESENT_VALUE.id()])
+                        # convert present value to int
+                        if object_type_code == ObjectType.MULTI_STATE_INPUT.code() or \
+                                object_type_code == ObjectType.MULTI_STATE_OUTPUT.code() or \
+                                object_type_code == ObjectType.MULTI_STATE_VALUE.code():
+                            data[ObjectProperty.PRESENT_VALUE.id()] = int(float(data[ObjectProperty.PRESENT_VALUE.id()]))
+                        # binary present value without changes actually it 'active' or 'inactive'
+                        data[ObjectProperty.OBJECT_IDENTIFIER.id()] = object_id
+                        data[ObjectProperty.DEVICE_ID.id()] = device_id
+                        data[ObjectProperty.OBJECT_TYPE.id()] = ObjectType.code_to_name(object_type_code)
+                        # object (data) ready to transmit to server side
+                        transmitter.push_collected_data(data)
+                except:
+                    logger.error(traceback.format_exc())
             time.sleep(self.period)
 
 
@@ -254,9 +279,9 @@ if __name__ == '__main__':
                             object_ids = [x[ObjectProperty.OBJECT_IDENTIFIER.id()] for x in objects]
                             logger.debug(
                                 "Collector# {} device: {} type: {} objects: {}".format(thread_idx,
-                                                                                              device.get_id(),
-                                                                                              object_type,
-                                                                                              object_ids))
+                                                                                       device.get_id(),
+                                                                                       object_type,
+                                                                                       object_ids))
                         data_collector_objects += objects
 
                 collector = VisiobasThreadDataCollector(thread_idx, transmitter)
