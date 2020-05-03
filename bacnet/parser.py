@@ -74,7 +74,7 @@ class TokenParser:
         """
         self.next_parser = None
         self.char_reader = char_reader
-        self.logger = logging.getLogger(__name__)
+        self.logger = logging.getLogger('bacnet.parser')
 
     def set_next_parser(self, next_parser):
         self.next_parser = next_parser
@@ -291,7 +291,7 @@ class TokensAnalyzer:
         :type token_reader TokenReader
         :return:
         """
-        logger = logging.getLogger(__name__)
+        logger = logging.getLogger('bacnet.parser')
         pos = token_reader.tell()
         while token_reader.current_token is not None and token_reader.current_token.type != open_type:
             token = token_reader.read()
@@ -382,7 +382,7 @@ class EntityPairParser:
         super().__init__()
         self.token_reader = token_reader
         self.next_parser = None
-        self.logger = logging.getLogger(__name__)
+        self.logger = logging.getLogger('bacnet.parser')
 
     def _extract_key(self):
         key = []
@@ -533,7 +533,7 @@ class PairsExtractor:
 
 class BACnetParser:
     def __init__(self):
-        self.logger = logging.getLogger(__name__)
+        self.logger = logging.getLogger('bacnet.parser')
 
     def parse_bacrpm(self, text):
         char_reader = CharReader(text)
@@ -594,6 +594,6 @@ class BACnetParser:
                 })
             return devices
         except BaseException as e:
-            logger = logging.getLogger(__name__)
+            logger = logging.getLogger('bacnet.parser')
             logger.error("Failed parse address cache:\n{}".format(text))
             raise e

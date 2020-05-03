@@ -11,7 +11,7 @@ class BACrpmSlicer:
         """
         self.bacrpm_app_path = bacrpm_app_path
         self.parser = BACnetParser()
-        self.logger = logging.getLogger(__name__)
+        self.logger = logging.getLogger('bacnet.slicer')
 
     def execute(self, device_id: int, object_type_code: int, object_id: int, fields: list):
         path = Path(self.bacrpm_app_path)
