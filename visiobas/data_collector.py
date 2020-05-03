@@ -1,21 +1,21 @@
-import argparse
 import logging
-import traceback
 import time
+import traceback
 from pathlib import Path
-import os
+from threading import Thread
 
 import bacnet.config
-from threading import Thread
-from bacnet.slicer import BACrpmSlicer
-from visiobas.object.device import Device
-from visiobas.visiobas_logging import initialize_logging
-from visiobas.gate_client import VisiobasGateClient
 import bacnet.config
 from bacnet.bacnet import ObjectProperty
 from bacnet.bacnet import ObjectType
 from bacnet.parser import BACnetParser
+from bacnet.slicer import BACrpmSlicer
+from visiobas.gate_client import VisiobasGateClient
+from visiobas.object.device import Device
+from visiobas.visiobas_logging import initialize_logging
 
+
+# class FilterBy
 
 class VisiobasTransmitter(Thread):
 
@@ -26,28 +26,53 @@ class VisiobasTransmitter(Thread):
         """
         super().__init__()
         # global collected data should be transmitted to server
-        self.collected_data = []
+        self.device_ids = []
+        self.collected_data = {}
         self.gate_client = gate_client
         self.period = period
         self.logger = logging.getLogger('visiobas.data_collector.transmitter')
 
     def push_collected_data(self, data):
-        self.collected_data.append(data)
+        try:
+            _id = data[ObjectProperty.OBJECT_IDENTIFIER.id()]
+            _device_id = data[ObjectProperty.DEVICE_ID.id()]
+            self.collected_data[_id] = data
+            if _device_id not in self.device_ids:
+                self.device_ids.append(_device_id)
+        except:
+            self.logger.error("Failed put collected data: {}".format(data))
+            self.logger.error(traceback.format_exc())
 
     def run(self) -> None:
         while True:
-            if len(self.collected_data) > 0:
-                if self.logger.isEnabledFor(logging.DEBUG):
-                    logger.debug("Prepare collected data size: {} for sending".format(len(self.collected_data)))
-                data = self.collected_data.pop()
-                # TODO collect batch data into one request group by device id
-                # replace old data
-                request = [data]
+            if len(self.collected_data) == 0:
+                continue
+            if len(self.device_ids) == 0:
+                continue
+            if self.logger.isEnabledFor(logging.DEBUG):
+                logger.debug("Prepare collected data size: {} of devices: {} for sending".format(
+                    len(self.collected_data), self.device_ids))
+            _device_ids = self.device_ids.copy()
+            # iterate over all object devices to be able to send all different device objects
+            while _device_ids:
+                _device_id = _device_ids.pop()
+                object_ids_group_by_device = list(
+                    filter(lambda _id: self.collected_data[_id][ObjectProperty.DEVICE_ID.id()] == _device_id,
+                           self.collected_data))
+                # remove from collected data grouped devices
+                _objects = []
+                for _id in object_ids_group_by_device:
+                    try:
+                        _objects.append(self.collected_data.pop(_id))
+                    except:
+                        self.logger.error(traceback.format_exc())
+                request = _objects
                 try:
-                    self.gate_client.rq_put(data[ObjectProperty.DEVICE_ID.id()], request)
+                    self.gate_client.rq_put(_device_id, request)
                 except Exception as e:
                     self.logger.error("Failed put data: {}".format(e))
                     self.logger.error("Failed put data: {}".format(request))
+
             time.sleep(self.period)
 
 
@@ -77,7 +102,7 @@ class VisiobasThreadDataCollector(Thread):
 
     def run(self):
         if self.logger.isEnabledFor(logging.INFO):
-            self.logger.info("Count of collecting objects: {}".format(len(self.objects)))
+            self.logger.info("Count of watching objects: {}".format(len(self.objects)))
         while True:
             slicer = BACrpmSlicer(bacnet.config.bacrmp_app_path)
             now = time.time()
@@ -211,7 +236,10 @@ if __name__ == '__main__':
                         if logger.isEnabledFor(logging.DEBUG):
                             object_ids = [x[ObjectProperty.OBJECT_IDENTIFIER.id()] for x in objects]
                             logger.debug(
-                                "Collector thread# {} type: {} objects: {}".format(thread_idx, object_type, object_ids))
+                                "Collector thread# {} device: {} type: {} objects: {}".format(thread_idx,
+                                                                                              device.get_id(),
+                                                                                              object_type,
+                                                                                              object_ids))
                         data_collector_objects += objects
 
                 collector = VisiobasThreadDataCollector(transmitter)
