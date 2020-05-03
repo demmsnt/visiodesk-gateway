@@ -19,12 +19,17 @@ from bacnet.parser import BACnetParser
 
 class VisiobasTransmitter(Thread):
 
-    def __init__(self, gate_client):
+    def __init__(self, gate_client, period: int = 1):
+        """
+        :param gate_client:
+        :param period: time in seconds waiting new data before send collected data to server
+        """
         super().__init__()
         # global collected data should be transmitted to server
         self.collected_data = []
         self.gate_client = gate_client
-        self.logger = logging.getLogger(__name__)
+        self.period = period
+        self.logger = logging.getLogger('visiobas.data_collector.transmitter')
 
     def push_collected_data(self, data):
         self.collected_data.append(data)
@@ -32,6 +37,8 @@ class VisiobasTransmitter(Thread):
     def run(self) -> None:
         while True:
             if len(self.collected_data) > 0:
+                if self.logger.isEnabledFor(logging.DEBUG):
+                    logger.debug("Prepare collected data size: {} for sending".format(len(self.collected_data)))
                 data = self.collected_data.pop()
                 # TODO collect batch data into one request group by device id
                 # replace old data
@@ -41,15 +48,21 @@ class VisiobasTransmitter(Thread):
                 except Exception as e:
                     self.logger.error("Failed put data: {}".format(e))
                     self.logger.error("Failed put data: {}".format(request))
-            time.sleep(1)
+            time.sleep(self.period)
 
 
 class VisiobasThreadDataCollector(Thread):
 
-    def __init__(self, transmitter):
+    def __init__(self, transmitter, period: float = 0.01):
+        """
+        :param transmitter:
+        :param period: time delay between next data collect iteration
+        """
         super().__init__()
         self.objects = []
         self.transmitter = transmitter
+        self.logger = logging.getLogger('visiobas.data_collector.collector')
+        self.period = period
 
     def add_object(self, device_id, object_type_code, object_id, slice_period=1, object_reference=None):
         # python list append operation should be thread safe
@@ -63,6 +76,8 @@ class VisiobasThreadDataCollector(Thread):
         })
 
     def run(self):
+        if self.logger.isEnabledFor(logging.INFO):
+            self.logger.info("Count of collecting objects: {}".format(len(self.objects)))
         while True:
             slicer = BACrpmSlicer(bacnet.config.bacrmp_app_path)
             now = time.time()
@@ -97,13 +112,13 @@ class VisiobasThreadDataCollector(Thread):
                         data[ObjectProperty.PRESENT_VALUE.id()] = float(data[ObjectProperty.PRESENT_VALUE.id()])
                     data[ObjectProperty.DEVICE_ID.id()] = device_id
                     transmitter.push_collected_data(data)
-            time.sleep(1)
+            time.sleep(self.period)
 
 
 # TODO remove main move test_visiobas into unit test_visiobas
 if __name__ == '__main__':
     initialize_logging()
-    logger = logging.getLogger(__name__)
+    logger = logging.getLogger('visiobas.data_collector')
 
     address_cache_path = bacnet.config.address_cache_path
     if not Path(address_cache_path).is_file():
@@ -195,7 +210,8 @@ if __name__ == '__main__':
                         objects = client.rq_device_object(device.get_id(), object_type)
                         if logger.isEnabledFor(logging.DEBUG):
                             object_ids = [x[ObjectProperty.OBJECT_IDENTIFIER.id()] for x in objects]
-                            logger.debug("Collector thread# {} type: {} objects: {}".format(thread_idx, object_type, object_ids))
+                            logger.debug(
+                                "Collector thread# {} type: {} objects: {}".format(thread_idx, object_type, object_ids))
                         data_collector_objects += objects
 
                 collector = VisiobasThreadDataCollector(transmitter)
