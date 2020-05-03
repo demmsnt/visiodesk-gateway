@@ -126,7 +126,7 @@ if __name__ == '__main__':
 
             server_devices = client.rq_devices()
             server_devices = list(
-                filter(lambda x: x[ObjectProperty.OBJECT_IDENTIFIER.id()] in device_id, server_devices))
+                filter(lambda x: x[ObjectProperty.OBJECT_IDENTIFIER.id()] in device_ids, server_devices))
             if not len(device_ids) == len(server_devices):
                 logger.warning("Not all bacwi table devices exist on server")
                 for address_cache_device in address_cache_devices:
@@ -153,14 +153,19 @@ if __name__ == '__main__':
                 if not host == server_device.get_host():
                     logger.warning("Server device {} host ({}) not equal with bacwi device host ({})".
                                    format(server_device.get_id(), server_device.get_host(), host))
+                    logger.warning("Using bacwi host value for data collection.\n\
+                                   Too resolve this issue update bacwi table or update server host value")
+                    server_device.set_host(host)
                 if not port == server_device.get_port():
                     logger.warning("Server device {} port ({}) not equal with bacwi device port ({})"
                                    .format(server_device.get_id(), server_device.get_port(), port))
+                    logger.warning("Using bacwi port value for data collection.\n\
+                                   Too resolve this issue update bacwi table or update server port value")
+                    server_device.set_port(port)
 
                 if port not in port_devices:
                     port_devices[port] = []
-                else:
-                    port_devices[port].append(server_device)
+                port_devices[port].append(server_device)
 
             thread_count = len(port_devices)
 

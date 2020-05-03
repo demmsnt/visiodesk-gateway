@@ -59,3 +59,13 @@ class Device(BACnetObject):
         default_apdu = 640
         apdu = self.get(ObjectProperty.APDU_TIMEOUT)
         return apdu if apdu is not None else default_apdu
+
+    def set_host(self, host):
+        if self.configuration_files is None:
+            self.configuration_files = {}
+        self.configuration_files['host'] = host
+
+    def set_port(self, port):
+        if self.configuration_files is None:
+            self.configuration_files = {}
+        self.configuration_files['port'] = port
