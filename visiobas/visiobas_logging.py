@@ -19,6 +19,6 @@ def initialize_logging():
     }
     loggers['bacnet.parser'].setLevel(logging.INFO)
     loggers['bacnet.slicer'].setLevel(logging.INFO)
-    loggers['visiobas.data_collector'].setLevel(logging.DEBUG)
-    loggers['visiobas.data_collector.collector'].setLevel(logging.DEBUG)
-    loggers['visiobas.data_collector.transmitter'].setLevel(logging.DEBUG)
+    loggers['visiobas.data_collector'].setLevel(logging.INFO)
+    loggers['visiobas.data_collector.collector'].setLevel(logging.INFO)
+    loggers['visiobas.data_collector.transmitter'].setLevel(logging.INFO)

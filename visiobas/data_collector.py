@@ -29,17 +29,17 @@ class VisiobasTransmitter(Thread):
         self.gate_client = gate_client
         self.period = period
         self.logger = logging.getLogger('visiobas.data_collector.transmitter')
+        # how many data was send by statistic period
+        self.statistic_send_object_count = 0
+        self.statistic_log_period = 10
+        self.statistic_send_start = time.time()
+        self.statistic_period_start = time.time()
 
     def push_collected_data(self, data):
         try:
             _id = data[ObjectProperty.OBJECT_IDENTIFIER.id()]
             _device_id = data[ObjectProperty.DEVICE_ID.id()]
             self.collected_data[_id] = data
-            if self.logger.isEnabledFor(logging.DEBUG):
-                self.logger.info("Push id: {}, device: {} collected data size: {}".format(
-                    _id,
-                    _device_id,
-                    len(self.collected_data)))
             if _device_id not in self.device_ids:
                 self.device_ids.append(_device_id)
         except:
@@ -48,6 +48,12 @@ class VisiobasTransmitter(Thread):
 
     def run(self) -> None:
         while True:
+            if self.logger.isEnabledFor(logging.INFO):
+                if time.time() - self.statistic_period_start > self.statistic_log_period:
+                    self.statistic_period_start = time.time()
+                    count = self.statistic_send_object_count
+                    rate = int(count / (time.time() - self.statistic_send_start))
+                    self.logger.info("Statistic send object: {}, rate: {:d} object / sec".format(count, rate))
             if len(self.collected_data) == 0:
                 continue
             if len(self.device_ids) == 0:
@@ -75,18 +81,20 @@ class VisiobasTransmitter(Thread):
                 except Exception as e:
                     self.logger.error("Failed put data: {}".format(e))
                     self.logger.error("Failed put data: {}".format(request))
+                self.statistic_send_object_count += len(_objects)
 
             time.sleep(self.period)
 
 
 class VisiobasThreadDataCollector(Thread):
 
-    def __init__(self, transmitter, period: float = 0.01):
+    def __init__(self, thread_idx, transmitter, period: float = 0.01):
         """
         :param transmitter:
         :param period: time delay between next data collect iteration
         """
         super().__init__()
+        self.thread_idx = thread_idx
         self.objects = []
         self.transmitter = transmitter
         self.logger = logging.getLogger('visiobas.data_collector.collector')
@@ -105,7 +113,7 @@ class VisiobasThreadDataCollector(Thread):
 
     def run(self):
         if self.logger.isEnabledFor(logging.INFO):
-            self.logger.info("Count of watching objects: {}".format(len(self.objects)))
+            self.logger.info("Collector# {} count of observable objects: {}".format(self.thread_idx, len(self.objects)))
         while True:
             slicer = BACrpmSlicer(bacnet.config.bacrmp_app_path)
             now = time.time()
@@ -251,7 +259,7 @@ if __name__ == '__main__':
                                                                                               object_ids))
                         data_collector_objects += objects
 
-                collector = VisiobasThreadDataCollector(transmitter)
+                collector = VisiobasThreadDataCollector(thread_idx, transmitter)
                 for o in data_collector_objects:
                     _device_id = o[ObjectProperty.DEVICE_ID.id()]
                     _id = o[ObjectProperty.OBJECT_IDENTIFIER.id()]
