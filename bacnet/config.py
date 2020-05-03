@@ -1,6 +1,6 @@
 from pathlib import Path
 
-bacnet_stack_path = Path("test_visiobas")
+bacnet_stack_path = Path("/W/element/npp/visiodesk-gateway/test_visiobas")
 bacrmp_app_path = bacnet_stack_path / "bacrpm.cmd"
 address_cache_path = bacnet_stack_path / "resource" / "address_cache"
 

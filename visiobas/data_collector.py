@@ -3,6 +3,7 @@ import logging
 import traceback
 import time
 from pathlib import Path
+import os
 
 import bacnet.config
 from threading import Thread
@@ -124,7 +125,8 @@ if __name__ == '__main__':
                             bacnet.config.visiobas_server['auth']['pwd'])
 
             server_devices = client.rq_devices()
-            server_devices = filter(lambda x: x[ObjectProperty.OBJECT_IDENTIFIER.id()] in device_id, server_devices)
+            server_devices = list(
+                filter(lambda x: x[ObjectProperty.OBJECT_IDENTIFIER.id()] in device_id, server_devices))
             if not len(device_ids) == len(server_devices):
                 logger.warning("Not all bacwi table devices exist on server")
                 for address_cache_device in address_cache_devices:
