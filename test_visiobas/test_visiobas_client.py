@@ -1,7 +1,7 @@
 import unittest
 from visiobas.client import VisiobasClient
 from visiobas.gate_client import VisiobasGateClient
-from visiobas.object_type import ObjectType
+from bacnet.bacnet import ObjectType
 from bacnet.bacnet import ObjectProperty
 import visiobas.visiobas_logging
 from random import randrange
@@ -61,7 +61,7 @@ class TestVisiobasGateClient(unittest.TestCase):
             self.assertTrue(port == 80)
 
     def test_rq_device_objects(self):
-        objects = self.client.rq_device_objects(200)
+        objects = self.client.rq_device_invalid_objects(200)
         self.assertTrue(objects is not None)
 
     def test_rq_binary_input(self):
@@ -82,6 +82,18 @@ class TestVisiobasGateClient(unittest.TestCase):
             }
             data.append(d)
         self.client.rq_put(device_id, data)
+
+    def test_rq_notification_class(self):
+        # not pass
+        object = self.client.rq_get_device_objects(device_id=1,
+                                                   object_id=1501,
+                                                   object_type=ObjectType.NOTIFICATION_CLASS)
+        self.assertTrue(object is not None)
+
+    def test_rq_notification_classes(self):
+        objects = self.client.rq_device_object(device_id=1,
+                                               object_type=ObjectType.NOTIFICATION_CLASS)
+        self.assertTrue(type(objects) is list)
 
 
 # ERROR 2020-04-19 20:44:09,596 __main__ run      Failed put data: {'79': 'analog-input', '75': 25307.0, '85': '52.13', '846': 200}

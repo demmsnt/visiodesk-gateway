@@ -1,5 +1,5 @@
 from visiobas.client import VisiobasClient
-from visiobas.object_type import ObjectType
+from bacnet.bacnet import ObjectType
 import json
 import logging
 
@@ -8,7 +8,7 @@ class VisiobasGateClient(VisiobasClient):
     def __init__(self, host, port, verify):
         VisiobasClient.__init__(self, host, port, verify=verify)
 
-    def rq_get_device_objects(self, device_id, object_id=None, object_type=None):
+    def rq_get_device_objects(self, device_id: int, object_id: int = None, object_type: ObjectType = None):
         """
         Request list of object under certain device
         :param device_id: device identifier
@@ -19,7 +19,7 @@ class VisiobasGateClient(VisiobasClient):
         :type object_type: visiobas_object_type.ObjectType
         """
         if object_id is not None and object_type is not None:
-            url = "{}/get/{}/{}/{}".format(self.get_addr(), device_id, object_id, object_type.name)
+            url = "{}/get/{}/{}/{}".format(self.get_addr(), device_id, object_id, object_type.name())
         else:
             url = "{}/get/{}".format(self.get_addr(), device_id)
         return self.get(url)
@@ -32,7 +32,12 @@ class VisiobasGateClient(VisiobasClient):
         url = "{}/vbas/gate/getDevices".format(self.get_addr())
         return self.get(url)
 
-    def rq_device_objects(self, device_id):
+    def rq_device_invalid_objects(self, device_id):
+        """
+        Return invalid objects
+        :param device_id:
+        :return:
+        """
         url = "{}/vbas/gate/get/{}/empty".format(self.get_addr(), device_id)
         return self.get(url)
 
