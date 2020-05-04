@@ -8,7 +8,6 @@ class Device(BACnetObject):
     def __init__(self, data):
         super().__init__(data)
         self.property_list = None
-        self.configuration_files = None
 
     def get_property_list(self):
         if self.property_list is not None:
@@ -20,15 +19,7 @@ class Device(BACnetObject):
             except:
                 return None
 
-    def get_configuration_files(self):
-        if self.configuration_files is not None:
-            return self.configuration_files
-        else:
-            try:
-                self.configuration_files = json.loads(self.get(ObjectProperty.CONFIGURATION_FILES))
-                return self.configuration_files
-            except:
-                return None
+
 
     def get_port(self):
         configuration_files = self.get_configuration_files()

@@ -14,6 +14,7 @@ from bacnet.slicer import BACrpmSlicer
 from visiobas.gate_client import VisiobasGateClient
 from visiobas.object.device import Device
 from visiobas.visiobas_logging import initialize_logging
+from visiobas.object.bacnet_object import BACnetObject
 
 
 class VisiobasTransmitter(Thread):
@@ -114,6 +115,11 @@ class VisiobasThreadDataCollector(Thread):
         self.transmitter = transmitter
         self.logger = logging.getLogger('visiobas.data_collector.collector')
         self.period = period
+        # statistic logging
+        self.statistic_parsed_object_count = 0
+        self.statistic_log_period = 10
+        self.statistic_start = time.time()
+        self.statistic_period_start = time.time()
 
     def add_object(self, device_id, object_type_code, object_id, pooling_period=3600, object_reference=None):
         # python list append operation should be thread safe
@@ -123,22 +129,31 @@ class VisiobasThreadDataCollector(Thread):
             "object_id": object_id,
             "object_reference": object_reference,
             "pooling_period": pooling_period,
+            "original_pooling_period": pooling_period,
             "time_last_success_pooling": 0,
             # special delay for distribute sensor pooling uniform
-            "pooling_delay": 0
+            "pooling_delay": -1
         })
 
     def run(self):
         if self.logger.isEnabledFor(logging.INFO):
             self.logger.info("Collector# {} count of observable objects: {}".format(self.thread_idx, len(self.objects)))
         while True:
+            if self.logger.isEnabledFor(logging.INFO):
+                if time.time() - self.statistic_period_start > self.statistic_log_period:
+                    self.statistic_period_start = time.time()
+                    count = self.statistic_parsed_object_count
+                    rate = int(count / (time.time() - self.statistic_start))
+                    self.logger.info(
+                        "Statistic parsed and push for transmit: {}, rate: {:d} object / sec".format(count, rate))
+
             slicer = BACrpmSlicer(bacnet.config.bacrmp_app_path)
             now = time.time()
             for _object in self.objects:
                 try:
                     time_last_success_pooling = _object["time_last_success_pooling"]
                     pooling_delay = _object["pooling_delay"]
-                    pooling_period = _object["pooling_period"] if pooling_delay == 0 else pooling_delay
+                    pooling_period = _object["pooling_period"]
                     device_id = _object["device_id"]
                     object_type_code = _object["object_type_code"]
                     object_id = _object["object_id"]
@@ -151,10 +166,13 @@ class VisiobasThreadDataCollector(Thread):
                         ObjectProperty.PRIORITY_ARRAY.id()
                     ]
 
-                    # make sensor pooling distributed more uniformed
-                    _object["pooling_delay"] = randint(1, int(pooling_period)) if pooling_delay == 0 else 0
-
                     if now - time_last_success_pooling > pooling_period:
+                        # make sensor pooling distributed more uniformed
+                        _object["pooling_delay"] = randint(1, max(int(pooling_period), 1)) \
+                            if pooling_delay == -1 else 0
+                        _object["pooling_period"] = _object["pooling_delay"] \
+                            if _object["pooling_delay"] > 0 else _object["original_pooling_period"]
+
                         data = slicer.execute(device_id, object_type_code, object_id, fields)
                         _object["time_last_success_pooling"] = time.time()
                         # prepare collected data and store to be transmitted to server
@@ -177,6 +195,7 @@ class VisiobasThreadDataCollector(Thread):
                         data[ObjectProperty.OBJECT_TYPE.id()] = ObjectType.code_to_name(object_type_code)
                         # object (data) ready to transmit to server side
                         transmitter.push_collected_data(data)
+                        self.statistic_parsed_object_count += 1
                 except:
                     logger.error(traceback.format_exc())
             time.sleep(self.period)
@@ -285,6 +304,8 @@ if __name__ == '__main__':
                                                                                        device.get_id(),
                                                                                        object_type,
                                                                                        object_ids))
+                        # for debug
+                        # objects = list(filter(lambda x : x[ObjectProperty.OBJECT_IDENTIFIER.id()] == 23701, objects))
                         data_collector_objects += objects
 
                 collector = VisiobasThreadDataCollector(thread_idx, transmitter)
@@ -292,17 +313,18 @@ if __name__ == '__main__':
                     _device_ids = [x.get_id() for x in _devices]
                     logger.info("Collector# {} collect devices: {}".format(thread_idx, _device_ids))
                 for o in data_collector_objects:
-                    _device_id = o[ObjectProperty.DEVICE_ID.id()]
-                    _id = o[ObjectProperty.OBJECT_IDENTIFIER.id()]
-                    _type_code = ObjectType.name_to_code(o[ObjectProperty.OBJECT_TYPE.id()])
-                    _period = 5
-                    _reference = o[ObjectProperty.OBJECT_PROPERTY_REFERENCE.id()]
+                    bacnet_object = BACnetObject(o)
+                    _device_id = bacnet_object.get_device_id()
+                    _id = bacnet_object.get_id()
+                    _type_code = bacnet_object.get_object_type_code()
+                    _pooling_period = bacnet_object.get_pooling_period()
+                    _reference = bacnet_object.get_object_reference()
 
                     collector.add_object(
                         _device_id,
                         _type_code,
                         _id,
-                        _period,
+                        _pooling_period,
                         _reference)
                 collector.start()
                 collectors.append(collector)
