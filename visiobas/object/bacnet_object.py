@@ -63,3 +63,24 @@ class BACnetObject:
 
     def get_object_reference(self):
         return self.get(ObjectProperty.OBJECT_PROPERTY_REFERENCE)
+
+    def get_low_limit(self):
+        return self.get(ObjectProperty.LOW_LIMIT)
+
+    def get_high_limit(self):
+        return self.get(ObjectProperty.HIGH_LIMIT)
+
+    def get_event_detection_enable(self):
+        return self.get(ObjectProperty.EVENT_DETECTION_ENABLE) == 1
+
+    def get_alarm_value(self):
+        return self.get(ObjectProperty.ALARM_VALUE)
+
+    def get_alarm_values(self):
+        alarm_values = self.get(ObjectProperty.ALARM_VALUES)
+        if alarm_values is None:
+            return []
+        try:
+            alarm_values.split(",")
+        except:
+            return []
