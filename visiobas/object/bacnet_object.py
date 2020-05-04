@@ -6,13 +6,24 @@ class BACnetObject:
     def __init__(self, data):
         self._data = data
         self.configuration_files = None
-        self._default_pooling_period = 3600
+        self._default_update_interval = 3600
+        self.property_list = None
 
     def get(self, object_property):
         try:
             return self._data[object_property.id()]
         except:
             return None
+
+    def get_property_list(self):
+        if self.property_list is not None:
+            return self.property_list
+        else:
+            try:
+                self.property_list = json.loads(self.get(ObjectProperty.PROPERTY_LIST))
+                return self.property_list
+            except:
+                return None
 
     def get_id(self):
         return self.get(ObjectProperty.OBJECT_IDENTIFIER)
@@ -27,16 +38,16 @@ class BACnetObject:
             except:
                 return None
 
-    def get_pooling_period(self):
-        configuration = self.get_configuration_files()
-        if configuration is None:
-            return self._default_pooling_period
-        if 'pooling_period' not in configuration:
-            return self._default_pooling_period
+    def get_update_interval(self):
+        property_list = self.get_property_list()
+        if property_list is None:
+            return self._default_update_interval
+        if 'update_interval' not in property_list:
+            return self._default_update_interval
         try:
-            return int(configuration['pooling_period'])
+            return int(property_list['update_interval'])
         except:
-            return self._default_pooling_period
+            return self._default_update_interval
 
     def get_device_id(self):
         return self.get(ObjectProperty.DEVICE_ID)

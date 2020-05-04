@@ -121,18 +121,18 @@ class VisiobasThreadDataCollector(Thread):
         self.statistic_start = time.time()
         self.statistic_period_start = time.time()
 
-    def add_object(self, device_id, object_type_code, object_id, pooling_period=3600, object_reference=None):
+    def add_object(self, device_id, object_type_code, object_id, update_interval=3600, object_reference=None):
         # python list append operation should be thread safe
         self.objects.append({
             "device_id": device_id,
             "object_type_code": object_type_code,
             "object_id": object_id,
             "object_reference": object_reference,
-            "pooling_period": pooling_period,
-            "original_pooling_period": pooling_period,
+            "update_interval": update_interval,
+            "original_update_interval": update_interval,
             "time_last_success_pooling": 0,
             # special delay for distribute sensor pooling uniform
-            "pooling_delay": -1
+            "update_delay": -1
         })
 
     def run(self):
@@ -152,8 +152,8 @@ class VisiobasThreadDataCollector(Thread):
             for _object in self.objects:
                 try:
                     time_last_success_pooling = _object["time_last_success_pooling"]
-                    pooling_delay = _object["pooling_delay"]
-                    pooling_period = _object["pooling_period"]
+                    update_delay = _object["update_delay"]
+                    update_interval = _object["update_interval"]
                     device_id = _object["device_id"]
                     object_type_code = _object["object_type_code"]
                     object_id = _object["object_id"]
@@ -166,12 +166,12 @@ class VisiobasThreadDataCollector(Thread):
                         ObjectProperty.PRIORITY_ARRAY.id()
                     ]
 
-                    if now - time_last_success_pooling > pooling_period:
+                    if now - time_last_success_pooling > update_interval:
                         # make sensor pooling distributed more uniformed
-                        _object["pooling_delay"] = randint(1, max(int(pooling_period), 1)) \
-                            if pooling_delay == -1 else 0
-                        _object["pooling_period"] = _object["pooling_delay"] \
-                            if _object["pooling_delay"] > 0 else _object["original_pooling_period"]
+                        _object["update_delay"] = randint(1, max(int(update_interval), 1)) \
+                            if update_delay == -1 else 0
+                        _object["update_interval"] = _object["update_delay"] \
+                            if _object["update_delay"] > 0 else _object["original_update_interval"]
 
                         data = slicer.execute(device_id, object_type_code, object_id, fields)
                         _object["time_last_success_pooling"] = time.time()
@@ -305,7 +305,9 @@ if __name__ == '__main__':
                                                                                        object_type,
                                                                                        object_ids))
                         # for debug
-                        # objects = list(filter(lambda x : x[ObjectProperty.OBJECT_IDENTIFIER.id()] == 23701, objects))
+                        # objects = list(filter(lambda x : x[ObjectProperty.OBJECT_IDENTIFIER.id()] == 23902, objects))
+                        # if len(objects) == 1:
+                        #    print(BACnetObject(objects[0]).get_update_interval())
                         data_collector_objects += objects
 
                 collector = VisiobasThreadDataCollector(thread_idx, transmitter)
@@ -317,14 +319,14 @@ if __name__ == '__main__':
                     _device_id = bacnet_object.get_device_id()
                     _id = bacnet_object.get_id()
                     _type_code = bacnet_object.get_object_type_code()
-                    _pooling_period = bacnet_object.get_pooling_period()
+                    _update_interval = bacnet_object.get_update_interval()
                     _reference = bacnet_object.get_object_reference()
 
                     collector.add_object(
                         _device_id,
                         _type_code,
                         _id,
-                        _pooling_period,
+                        _update_interval,
                         _reference)
                 collector.start()
                 collectors.append(collector)

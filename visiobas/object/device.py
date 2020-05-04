@@ -7,19 +7,6 @@ from visiobas.object.bacnet_object import BACnetObject
 class Device(BACnetObject):
     def __init__(self, data):
         super().__init__(data)
-        self.property_list = None
-
-    def get_property_list(self):
-        if self.property_list is not None:
-            return self.property_list
-        else:
-            try:
-                self.property_list = json.loads(self.get(ObjectProperty.PROPERTY_LIST))
-                return self.property_list
-            except:
-                return None
-
-
 
     def get_port(self):
         configuration_files = self.get_configuration_files()
