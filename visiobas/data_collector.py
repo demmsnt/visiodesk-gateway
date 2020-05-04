@@ -3,6 +3,7 @@ import time
 import traceback
 from pathlib import Path
 from threading import Thread
+from random import randint
 
 import bacnet.config
 import bacnet.config
@@ -17,7 +18,7 @@ from visiobas.visiobas_logging import initialize_logging
 
 class VisiobasTransmitter(Thread):
 
-    def __init__(self, gate_client, period: int = 1):
+    def __init__(self, gate_client, period: int = 5):
         """
         :param gate_client:
         :param period: time in seconds waiting new data before send collected data to server
@@ -114,15 +115,17 @@ class VisiobasThreadDataCollector(Thread):
         self.logger = logging.getLogger('visiobas.data_collector.collector')
         self.period = period
 
-    def add_object(self, device_id, object_type_code, object_id, slice_period=1, object_reference=None):
+    def add_object(self, device_id, object_type_code, object_id, pooling_period=3600, object_reference=None):
         # python list append operation should be thread safe
         self.objects.append({
             "device_id": device_id,
             "object_type_code": object_type_code,
             "object_id": object_id,
             "object_reference": object_reference,
-            "slice_period": slice_period,
-            "time_last_success_slice": 0
+            "pooling_period": pooling_period,
+            "time_last_success_pooling": 0,
+            # special delay for distribute sensor pooling uniform
+            "pooling_delay": 0
         })
 
     def run(self):
@@ -133,26 +136,27 @@ class VisiobasThreadDataCollector(Thread):
             now = time.time()
             for _object in self.objects:
                 try:
-                    time_last_success_slice = _object["time_last_success_slice"]
-                    slice_period = _object["slice_period"]
+                    time_last_success_pooling = _object["time_last_success_pooling"]
+                    pooling_delay = _object["pooling_delay"]
+                    pooling_period = _object["pooling_period"] if pooling_delay == 0 else pooling_delay
                     device_id = _object["device_id"]
                     object_type_code = _object["object_type_code"]
                     object_id = _object["object_id"]
                     object_reference = _object["object_reference"]
                     fields = [
-                        # ObjectProperty.OBJECT_IDENTIFIER.id(),
-                        # ObjectProperty.OBJECT_PROPERTY_REFERENCE.id(),
-                        # ObjectProperty.OBJECT_TYPE.id(),
                         ObjectProperty.OUT_OF_SERVICE.id(),
                         ObjectProperty.PRESENT_VALUE.id(),
                         ObjectProperty.RELIABILITY.id(),
                         ObjectProperty.STATUS_FLAGS.id(),
                         ObjectProperty.PRIORITY_ARRAY.id()
-                        # ObjectProperty.SYSTEM_STATUS.id()
                     ]
-                    if now - time_last_success_slice > slice_period:
+
+                    # make sensor pooling distributed more uniformed
+                    _object["pooling_delay"] = randint(1, int(pooling_period)) if pooling_delay == 0 else 0
+
+                    if now - time_last_success_pooling > pooling_period:
                         data = slicer.execute(device_id, object_type_code, object_id, fields)
-                        _object["time_last_success_slice"] = time.time()
+                        _object["time_last_success_pooling"] = time.time()
                         # prepare collected data and store to be transmitted to server
                         if object_reference is not None:
                             data[ObjectProperty.OBJECT_PROPERTY_REFERENCE.id()] = object_reference
@@ -165,7 +169,8 @@ class VisiobasThreadDataCollector(Thread):
                         if object_type_code == ObjectType.MULTI_STATE_INPUT.code() or \
                                 object_type_code == ObjectType.MULTI_STATE_OUTPUT.code() or \
                                 object_type_code == ObjectType.MULTI_STATE_VALUE.code():
-                            data[ObjectProperty.PRESENT_VALUE.id()] = int(float(data[ObjectProperty.PRESENT_VALUE.id()]))
+                            data[ObjectProperty.PRESENT_VALUE.id()] = int(
+                                float(data[ObjectProperty.PRESENT_VALUE.id()]))
                         # binary present value without changes actually it 'active' or 'inactive'
                         data[ObjectProperty.OBJECT_IDENTIFIER.id()] = object_id
                         data[ObjectProperty.DEVICE_ID.id()] = device_id
@@ -225,8 +230,6 @@ if __name__ == '__main__':
                     if device[ObjectProperty.OBJECT_IDENTIFIER.id()] == _device_id:
                         server_device = device
                         break
-                # server_device = next((x for x in server_devices
-                #                       if lambda d: d[ObjectProperty.OBJECT_IDENTIFIER.id()] == _device_id), None)
                 if server_device is None:
                     continue
 
