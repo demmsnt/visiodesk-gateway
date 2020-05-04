@@ -111,6 +111,4 @@ Response
 }
 </pre>
 
-+ __Write set point__
-
-  
++ __Write set point__  
