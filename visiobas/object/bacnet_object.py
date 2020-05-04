@@ -6,7 +6,7 @@ class BACnetObject:
     def __init__(self, data):
         self._data = data
         self.configuration_files = None
-        self._default_pooling_period = 300
+        self._default_pooling_period = 3600
 
     def get(self, object_property):
         try:
