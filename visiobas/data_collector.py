@@ -340,6 +340,11 @@ if __name__ == '__main__':
             client.rq_login(bacnet.config.visiobas_server['auth']['user'],
                             bacnet.config.visiobas_server['auth']['pwd'])
 
+            # get notification class objects
+            notification_class = client.rq_device_object(1, ObjectType.NOTIFICATION_CLASS)
+            for o in notification_class:
+                bacnet_objects[o[ObjectProperty.OBJECT_IDENTIFIER.id()]] = BACnetObject(o)
+
             server_devices = client.rq_devices()
             server_devices = list(
                 filter(lambda x: x[ObjectProperty.OBJECT_IDENTIFIER.id()] in device_ids, server_devices))
@@ -428,8 +433,14 @@ if __name__ == '__main__':
                         # objects = list(filter(lambda x : x[ObjectProperty.OBJECT_IDENTIFIER.id()] == 23902, objects))
                         # if len(objects) == 1:
                         #    print(BACnetObject(objects[0]).get_update_interval())
+
+                        # collect map of bacnet object and link reference with notification class object
                         for o in objects:
-                            bacnet_objects[o[ObjectProperty.OBJECT_IDENTIFIER.id()]] = BACnetObject(o)
+                            bacnet_object = BACnetObject(o)
+                            notification_class = bacnet_object.get_notification_class()
+                            if not notification_class == 0 and notification_class in bacnet_objects:
+                                bacnet_object.set_notification_object(notification_class)
+                            bacnet_objects[o[ObjectProperty.OBJECT_IDENTIFIER.id()]] = bacnet_object
                         data_collector_objects += objects
 
                 collector = VisiobasThreadDataCollector(thread_idx, notifier)
@@ -438,18 +449,7 @@ if __name__ == '__main__':
                     logger.info("Collector# {} collect devices: {}".format(thread_idx, _device_ids))
                 for o in data_collector_objects:
                     bacnet_object = BACnetObject(o)
-                    # _device_id = bacnet_object.get_device_id()
-                    # _id = bacnet_object.get_id()
-                    # _type_code = bacnet_object.get_object_type_code()
-                    # _update_interval = bacnet_object.get_update_interval()
-                    # _reference = bacnet_object.get_object_reference()
                     collector.add_object(bacnet_object)
-                    # collector.add_object(
-                    #     _device_id,
-                    #     _type_code,
-                    #     _id,
-                    #     _update_interval,
-                    #     _reference)
                 collector.start()
                 collectors.append(collector)
                 thread_idx += 1

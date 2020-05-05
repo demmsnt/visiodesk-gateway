@@ -8,8 +8,9 @@ class BACnetObject:
         self.configuration_files = None
         self._default_update_interval = 3600
         self.property_list = None
+        self.notification_object = None
 
-    def get(self, object_property):
+    def get(self, object_property: ObjectProperty):
         try:
             return self._data[object_property.id()]
         except:
@@ -84,3 +85,19 @@ class BACnetObject:
             alarm_values.split(",")
         except:
             return []
+
+    def get_notification_class(self):
+        try:
+            return int(self.get(ObjectProperty.NOTIFICATION_CLASS))
+        except:
+            return 0
+
+    def set_notification_object(self, notification_object):
+        """
+        :type notification_object: BACnetObject
+        :return:
+        """
+        self.notification_object = notification_object
+
+    def get_notification_object(self):
+        return self.notification_object
