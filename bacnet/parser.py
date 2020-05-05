@@ -179,6 +179,31 @@ class WhitespaceTokenParser(TokenParser):
         return None
 
 
+class PrintableTokenParser(TokenParser):
+
+    def __init__(self, char_reader):
+        super().__init__(char_reader)
+
+    def _try_parse_next_token(self):
+        self.char_reader.skip_whitespace()
+        c = self.char_reader.current_char
+        if c is None:
+            return None
+        if not c.isprintable():
+            return None
+        value = ""+c
+        c = self.char_reader.read(skip_whitespace=False)
+        while c is not None and c.isprintable():
+            try:
+                value += c
+                c = self.char_reader.read(skip_whitespace=False)
+            except:
+                self.logger.debug("Failed parse printable token string, value: {}".format(value))
+        # move next char because current char is "
+        # self.char_reader.read(skip_whitespace=False)
+        return Token(TokenType.STRING, value)
+
+
 class QuotedStringTokenParser(TokenParser):
 
     def __init__(self, char_reader):
@@ -327,12 +352,14 @@ class TokensExtractor:
         number_or_string_token_parser = NumberOrStringTokenParser(char_reader)
         punctuation_parser = PunctuationTokenParser(char_reader)
         quoted_string_parser = QuotedStringTokenParser(char_reader)
+        printable_string_parser = PrintableTokenParser(char_reader)
         whitespace_parser = WhitespaceTokenParser(char_reader)
 
         whitespace_parser.set_next_parser(punctuation_parser)
         punctuation_parser.set_next_parser(hash_token_parser)
         hash_token_parser.set_next_parser(number_or_string_token_parser)
         number_or_string_token_parser.set_next_parser(quoted_string_parser)
+        quoted_string_parser.set_next_parser(printable_string_parser)
         self.head_parser = whitespace_parser
         self.tokens = []
 

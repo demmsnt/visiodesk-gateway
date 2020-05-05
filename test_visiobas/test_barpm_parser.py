@@ -5,6 +5,7 @@ import logging
 from bacnet.parser import BACnetParser
 from bacnet.writer import BACnetWriter
 from bacnet.bacnet import bacnet_name_map
+from bacnet.bacnet import ObjectProperty
 
 
 class BACnetParserTest(unittest.TestCase):
@@ -21,8 +22,8 @@ class BACnetParserTest(unittest.TestCase):
             parser = BACnetParser()
             object = parser.parse_bacrpm(text)
             self.assertTrue(object is not None)
-            self.assertTrue(object[bacnet_name_map["object-identifier"]], 3000022)
-            self.assertTrue(object[bacnet_name_map["object-type"]], "analog-input")
+            self.assertTrue(object[ObjectProperty.OBJECT_IDENTIFIER.id()], 3000022)
+            self.assertTrue(object[ObjectProperty.OBJECT_TYPE.id()], "analog-input")
 
     def test_bacwi_parser(self):
         path = "{}/resource/address_cache".format(os.path.dirname(os.path.abspath(__file__)))

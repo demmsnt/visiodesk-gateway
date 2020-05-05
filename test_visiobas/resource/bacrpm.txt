@@ -1,5 +1,6 @@
 analog-input #3000022
 {
+    reliability: ?
     proprietary 900: BACnet Error: property: unknown-property
     object-identifier: (analog-input, 3000022)
     object-name: "ANALOG VALUE 1"
