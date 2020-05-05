@@ -9,7 +9,7 @@ import argparse
 
 import bacnet.config
 import bacnet.config
-from bacnet.bacnet import ObjectProperty
+from bacnet.bacnet import ObjectProperty, StatusFlag
 from bacnet.bacnet import ObjectType
 from bacnet.parser import BACnetParser
 from bacnet.slicer import BACrpmSlicer
@@ -193,10 +193,10 @@ class VisiobasNotifier(Thread):
                 if id in self.bacnet_objects:
                     bacnet_object = self.bacnet_objects[id]
                     if self.verify_if_necessary_object_out_of_limit(bacnet_object, data):
-                        # present value out of limit
-                        # data[]
-
-                        pass
+                        status_flags = StatusFlag(data[ObjectProperty.STATUS_FLAGS.id()])
+                        # TODO need to verify does need to establish in_alarm flag or not?
+                        status_flags.set_in_alarm(True)
+                        data[ObjectProperty.STATUS_FLAGS.id()] = status_flags.as_list()
                 self.transmitter.push_collected_data(data)
                 self.statistic_verified_object_count += 1
             time.sleep(0.01)

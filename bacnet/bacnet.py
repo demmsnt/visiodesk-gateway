@@ -771,3 +771,51 @@ class ObjectType(enum.Enum):
             if _type.code() == code:
                 return _type.name()
         return None
+
+
+class StatusFlag:
+    def __init__(self, status_flag: list = None) -> None:
+        self.in_alarm = False
+        self.fault = False
+        self.overridden = False
+        self.out_of_service = False
+
+        if status_flag is not None and status_flag is list:
+            try:
+                self.in_alarm = status_flag[0]
+                self.fault = status_flag[1]
+                self.overridden = status_flag[2]
+                self.out_of_service = status_flag[3]
+            except:
+                pass
+
+    @staticmethod
+    def create(in_alarm=False, fault=False, overridden=False, out_of_service=False):
+        return [in_alarm, fault, overridden, out_of_service]
+
+    def get_in_alarm(self):
+        return self.in_alarm
+
+    def get_fault(self):
+        return self.fault
+
+    def get_overridden(self):
+        return self.overridden
+
+    def get_out_of_service(self):
+        return self.out_of_service
+
+    def set_in_alarm(self, flag: bool):
+        self.in_alarm = flag
+
+    def set_fault(self, flag: bool):
+        self.fault = flag
+
+    def set_overridden(self, flag: bool):
+        self.overridden = flag
+
+    def set_out_of_service(self, flag: bool):
+        self.out_of_service = flag
+
+    def as_list(self):
+        return [self.in_alarm, self.fault, self.overridden, self.out_of_service]
