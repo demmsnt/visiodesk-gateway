@@ -362,7 +362,12 @@ class VisiobasDataVerifier(Thread):
                     if bacnet_object.get_event_detection_enable():
                         # status_flags = StatusFlag(bacnet_object.get_status_flags())
                         if self.verify_object_out_of_limit(bacnet_object, data):
-                            # TODO setup alarm flag
+                            # setup alarm flag
+                            status_flag = StatusFlag(data[ObjectProperty.STATUS_FLAGS.id()]
+                                                     if ObjectProperty.STATUS_FLAGS.id() in data else None)
+                            status_flag.set_in_alarm(True)
+                            data[ObjectProperty.STATUS_FLAGS.id()] = status_flag.as_list()
+                            # mark object for notification
                             self.notifier.push_collected_data(data, Transition.TO_OFFNORMAL)
                             # status_flags = StatusFlag(data[ObjectProperty.STATUS_FLAGS.id()])
                             # TODO need to verify does need to establish in_alarm flag or not?
