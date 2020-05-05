@@ -39,6 +39,12 @@ class VisiobasClient:
         return self.__extract_response_data(
             self.__request('get', url, headers, cookies=cookies))
 
+    def get_json(self, url):
+        headers = {
+            "Content-type": "application/json;charset=UTF-8"
+        }
+        return self.get(url, headers=headers)
+
     def delete(self, url, headers=None, cookies=None) -> list or dict:
         return self.__extract_response_data(
             self.__request('delete', url, headers, cookies))

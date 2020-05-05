@@ -65,44 +65,54 @@ class VisiobasGateClient(VisiobasClient):
         js = json.dumps(data)
         return self.post(url, js, headers=headers)
 
-    def rq_vdesk_status_list(self) -> list:
+    def rq_vdesk_get_status_list(self) -> list:
         url = "{}/vdesk/arm/getStatusList".format(self.get_addr())
-        headers = {
-            "Content-type": "application/json;charset=UTF-8"
-        }
-        return self.get(url, headers=headers)
+        return self.get_json(url)
 
-    def rq_vdesk_priorities(self) -> list:
+    def rq_vdesk_get_priorities(self) -> list:
         url = "{}/vdesk/arm/getPriorities".format(self.get_addr())
-        headers = {
-            "Content-type": "application/json;charset=UTF-8"
-        }
-        return self.get(url, headers=headers)
+        return self.get_json(url)
 
-    def rq_vdesk_support_levels(self) -> list:
+    def rq_vdesk_get_support_levels(self) -> list:
         url = "{}/vdesk/arm/getSupportLevels".format(self.get_addr())
-        headers = {
-            "Content-type": "application/json;charset=UTF-8"
-        }
-        return self.get(url, headers=headers)
+        return self.get_json(url)
 
-    def rq_vdesk_user_types(self):
+    def rq_vdesk_get_user_types(self):
         url = "{}/vdesk/arm/getUserTypes".format(self.get_addr())
-        headers = {
-            "Content-type": "application/json;charset=UTF-8"
-        }
-        return self.get(url, headers=headers)
+        return self.get_json(url)
 
-    def rq_vdesk_topic_type_items(self):
+    def rq_vdesk_get_topic_type_items(self):
         url = "{}/vdesk/arm/getTopicItemTypes".format(self.get_addr())
+        return self.get_json(url)
+
+    def rq_vdesk_get_topic_types(self):
+        url = "{}/vdesk/arm/getTopicTypes".format(self.get_addr())
+        return self.get_json(url)
+
+    def rq_vdesk_get_groups(self):
+        url = "{}/vdesk/arm/getGroups".format(self.get_addr())
+        return self.get_json(url)
+
+    def rq_vdesk_get_users_by_group(self):
+        # TODO not work
+        url = "{}/vdesk/arm/getUsersByGroup".format(self.get_addr())
+        return self.get_json(url)
+
+    def rq_vdesk_get_users(self):
+        url = "{}/vdesk/arm/getUsers".format(self.get_addr())
+        return self.get_json(url)
+
+    def rq_vdesk_get_user_by_id(self, user_id: int):
+        url = "{}/vdesk/arm/getUserById".format(self.get_addr())
         headers = {
-            "Content-type": "application/json;charset=UTF-8"
+            "Content-type": "application/json;charset=UTF-8",
+            "X-ID": user_id
         }
         return self.get(url, headers=headers)
 
-    def rq_vdesk_topic_types(self):
-        url = "{}/vdesk/arm/getTopicTypes".format(self.get_addr())
+    def rq_vdesk_add_topic_item(self, data):
+        url = "{}/vdesk/arm/addTopicItem".format(self.get_addr())
         headers = {
-            "Content-type": "application/json;charset=UTF-8"
+            "Content-type": "application/json;charset=UTF-8",
         }
-        return self.get(url, headers=headers)
+        return self.post(url, data, headers=headers)
