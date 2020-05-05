@@ -126,3 +126,12 @@ class VisiobasGateClient(VisiobasClient):
         }
         js = json.dumps(data)
         return self.post(url, js, headers=headers)
+
+    def rq_vdesk_get_topic_by_user(self, user_id: int = None):
+        url = "{}/vdesk/arm/getTopicsByUser".format(self.get_addr())
+        headers = {
+            "Content-type": "application/json;charset=UTF-8",
+        }
+        if user_id is not None:
+            headers["X-ID"] = user_id
+        return self.get(url, headers=headers)

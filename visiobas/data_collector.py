@@ -15,8 +15,10 @@ from bacnet.parser import BACnetParser
 from bacnet.slicer import BACrpmSlicer
 from visiobas.gate_client import VisiobasGateClient
 from visiobas.object.device import Device
+from visiobas.object.notification_class import NotificationClass
 from visiobas.visiobas_logging import initialize_logging
 from visiobas.object.bacnet_object import BACnetObject
+from visiobas import visiodesk
 
 
 class VisiobasTransmitter(Thread):
@@ -107,11 +109,155 @@ class VisiobasTransmitter(Thread):
 class VisiobasNotifier(Thread):
     def __init__(self,
                  client: VisiobasGateClient,
+                 bacnet_objects: dict,
+                 notification_group_name):
+        super().__init__()
+        self.client = client
+        self.bacnet_objects = bacnet_objects
+        self.collected_data = {}
+        self.logger = logging.getLogger('visiobas.data_collector.notifier')
+        self.notification_group_name = notification_group_name
+        self.notification_group_id = self.__find_notification_group_id()
+
+    def push_collected_data(self, data):
+        try:
+            id = data[ObjectProperty.OBJECT_IDENTIFIER.id()]
+            self.collected_data[id] = data
+        except:
+            self.logger.error("Failed put collected data: {}".format(data))
+            self.logger.error(traceback.format_exc())
+
+    @staticmethod
+    def __is_reference(reference: str):
+        return reference.startswith("Site:")
+
+    def __find_topic(self, reference):
+        try:
+            topics = self.client.rq_vdesk_get_topic_by_user()
+            for topic in topics:
+                items = topic['items']
+                for item in items:
+                    if item['type']['id'] == visiodesk.ItemType.MESSAGE.id():
+                        if self.__is_reference(item['text']):
+                            item_reference = item['text']
+                            if item_reference == reference:
+                                return found
+            return None
+        except:
+            self.logger.error(traceback.format_exc())
+            return None
+
+    def __find_notification_group_id(self) -> int:
+        try:
+            groups = self.client.rq_vdesk_get_groups()
+            found = next(filter(lambda g: g["name"] == self.notification_group_name, groups), None)
+            return found['id'] if found is not None else 0
+        except:
+            self.logger.error(traceback.format_exc())
+            return 0
+
+    def __create_topic(self, bacnet_object: BACnetObject):
+        description = bacnet_object.get_description()
+        reference = bacnet_object.get_object_reference()
+        topic_title = description if description else reference
+        topic_description = "[p]{} OUT OF LIMITS[/p]".format(topic_title)
+        data = {
+            "name": topic_title,
+            "topic_type": {"id": visiodesk.TopicType.EVENT.id()},
+            "items": [
+                {
+                    "type": {
+                        "id": visiodesk.ItemType.PRIORITY.id()
+                    },
+                    "priority": {
+                        "id": visiodesk.TopicPriority.HEED.id()
+                    },
+                    "text": visiodesk.TopicPriority.HEED.name(),
+                    "name": "Повышенный",
+                    "like": 0
+                },
+                {
+                    "type": {
+                        "id": visiodesk.ItemType.STATUS.id()
+                    },
+                    "status": {
+                        "id": visiodesk.TopicStatus.NEW.id()
+                    },
+                    "text": visiodesk.TopicStatus.NEW.name(),
+                    "name": "Новая",
+                    "like": 0
+                },
+                {
+                    "type": {
+                        "id": visiodesk.ItemType.MESSAGE.id()
+                    },
+                    "text": reference,
+                    "name": "Сообщение",
+                    "like": 0
+                }
+            ],
+            "groups": [{"id": self.notification_group_id}],
+            "description": topic_description
+        }
+        self.client.rq_vdesk_add_topic(data)
+
+    def __change_status_if_necessary(self, topic, bacnet_object):
+        try:
+            items = topic['items']
+            last_status_id = None
+            for item in items:
+                last_status_id = item['type']['id']
+            if last_status_id == visiodesk.TopicStatus.RESOLVED.id():
+                self.client.rq_vdesk_add_topic_item({
+                    "text": visiodesk.TopicType.NEW.name(),
+                    "type": {
+                        "id": visiodesk.ItemType.STATUS.id(),
+                        "name": "status",
+                        "title": "Статус"
+                    },
+                    "status": {
+                        "id": visiodesk.TopicStatus.NEW.id(),
+                        "name": visiodesk.TopicStatus.NEW.name(),
+                        "title": "Новый"
+                    }
+                })
+        except:
+            self.logger.error("Failed change topic status")
+            self.logger.error(traceback.format_exc())
+
+    def create_notification_out_of_limits(self, data, bacnet_object):
+        topic = self.__find_topic(bacnet_object.get_object_reference())
+        if topic is None:
+            self.__create_topic(bacnet_object)
+        else:
+            self.__change_status_if_necessary(topic, bacnet_object)
+
+    def run(self) -> None:
+        while True:
+            ids = list(self.collected_data.keys())
+            for id in ids:
+                try:
+                    data = self.collected_data.pop(id)
+                    if id not in self.bacnet_objects:
+                        continue
+                    self.create_notification_out_of_limits(data, self.bacnet_objects[id])
+                except:
+                    self.logger.error("Notification failed")
+                    self.logger.error(traceback.format_exc())
+
+            time.sleep(1)
+
+
+class VisiobasDataVerifier(Thread):
+    def __init__(self,
+                 client: VisiobasGateClient,
                  transmitter: VisiobasTransmitter,
+                 notifier: VisiobasNotifier,
                  bacnet_objects: dict):
         super().__init__()
-        self.logger = logging.getLogger('visiobas.data_collector.notifier')
+        self.logger = logging.getLogger('visiobas.data_collector.verifier')
         self.transmitter = transmitter
+        self.notifier = notifier
         self.collected_data = {}
         self.bacnet_objects = bacnet_objects
         self.client = client
@@ -193,10 +339,11 @@ class VisiobasNotifier(Thread):
                 if id in self.bacnet_objects:
                     bacnet_object = self.bacnet_objects[id]
                     if self.verify_if_necessary_object_out_of_limit(bacnet_object, data):
-                        status_flags = StatusFlag(data[ObjectProperty.STATUS_FLAGS.id()])
+                        self.notifier.push_collected_data(data)
+                        # status_flags = StatusFlag(data[ObjectProperty.STATUS_FLAGS.id()])
                         # TODO need to verify does need to establish in_alarm flag or not?
-                        status_flags.set_in_alarm(True)
-                        data[ObjectProperty.STATUS_FLAGS.id()] = status_flags.as_list()
+                        # status_flags.set_in_alarm(True)
+                        # data[ObjectProperty.STATUS_FLAGS.id()] = status_flags.as_list()
                 self.transmitter.push_collected_data(data)
                 self.statistic_verified_object_count += 1
             time.sleep(0.01)
@@ -206,12 +353,12 @@ class VisiobasThreadDataCollector(Thread):
 
     def __init__(self,
                  thread_idx: int,
-                 notifier: VisiobasNotifier,
+                 verifier: VisiobasDataVerifier,
                  period: float = 0.01):
         super().__init__()
         self.thread_idx = thread_idx
         self.objects = []
-        self.notifier = notifier
+        self.verifier = verifier
         # self.transmitter = transmitter
         self.logger = logging.getLogger('visiobas.data_collector.collector')
         self.period = period
@@ -300,7 +447,7 @@ class VisiobasThreadDataCollector(Thread):
                         data[ObjectProperty.OBJECT_TYPE.id()] = ObjectType.code_to_name(object_type_code)
                         # object (data) ready to transmit to server side
                         # transmitter.push_collected_data(data, _object["bacnet_object"])
-                        self.notifier.push_collected_data(data)
+                        self.verifier.push_collected_data(data)
                         self.statistic_parsed_object_count += 1
                 except:
                     logger.error(traceback.format_exc())
@@ -343,7 +490,7 @@ if __name__ == '__main__':
             # get notification class objects
             notification_class = client.rq_device_object(1, ObjectType.NOTIFICATION_CLASS)
             for o in notification_class:
-                bacnet_objects[o[ObjectProperty.OBJECT_IDENTIFIER.id()]] = BACnetObject(o)
+                bacnet_objects[o[ObjectProperty.OBJECT_IDENTIFIER.id()]] = NotificationClass(o)
 
             server_devices = client.rq_devices()
             server_devices = list(
@@ -401,9 +548,13 @@ if __name__ == '__main__':
             transmitter.setDaemon(True)
             transmitter.start()
 
-            notifier = VisiobasNotifier(client, transmitter, bacnet_objects)
-            notifier.setDaemon(True)
-            notifier.start()
+            notifier = VisiobasNotifier(client,
+                                        bacnet_objects,
+                                        bacnet.config.visiobas_server['notification']['group'])
+
+            verifier = VisiobasDataVerifier(client, transmitter, notifier, bacnet_objects)
+            verifier.setDaemon(True)
+            verifier.start()
 
             # list of object types for collect
             object_types = [
@@ -441,13 +592,14 @@ if __name__ == '__main__':
                         # collect map of bacnet object and link reference with notification class object
                         for o in objects:
                             bacnet_object = BACnetObject(o)
-                            notification_class = bacnet_object.get_notification_class()
-                            if not notification_class == 0 and notification_class in bacnet_objects:
+                            notification_class_id = bacnet_object.get_notification_class()
+                            if not notification_class_id == 0 and notification_class_id in bacnet_objects:
+                                notification_class = bacnet_objects[notification_class_id]
                                 bacnet_object.set_notification_object(notification_class)
                             bacnet_objects[o[ObjectProperty.OBJECT_IDENTIFIER.id()]] = bacnet_object
                         data_collector_objects += objects
 
-                collector = VisiobasThreadDataCollector(thread_idx, notifier)
+                collector = VisiobasThreadDataCollector(thread_idx, verifier)
                 if logger.isEnabledFor(logging.INFO):
                     _device_ids = [x.get_id() for x in _devices]
                     logger.info("Collector# {} collect devices: {}".format(thread_idx, _device_ids))

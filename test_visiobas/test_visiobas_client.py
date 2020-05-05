@@ -6,6 +6,7 @@ from bacnet.bacnet import ObjectProperty
 import visiobas.visiobas_logging
 from random import randrange
 from test_visiobas import test_config
+from visiobas.object.bacnet_object import BACnetObject
 from visiobas.object.device import Device
 from visiobas import visiodesk
 
@@ -157,12 +158,17 @@ class TestVisiobasGateClient(unittest.TestCase):
         print(l)
 
     def test_rq_vdesk_add_topic(self):
+        some_object = BACnetObject(self.client.rq_device_object(200, ObjectType.ANALOG_INPUT)[0])
+        description = some_object.get_description()
+        reference = some_object.get_object_reference()
+        topic_title = description if description else reference
+
         groups = self.client.rq_vdesk_get_groups()
         found = next(filter(lambda g: g["name"] == "VisioDESK", groups), None)
         if found is None:
             self.assertTrue(False)
         data = {
-            "name": "ALARM!!!",
+            "name": topic_title,
             "topic_type": {
                 "id": visiodesk.TopicType.EVENT.id()
             },
@@ -193,7 +199,7 @@ class TestVisiobasGateClient(unittest.TestCase):
                     "type": {
                         "id": visiodesk.ItemType.MESSAGE.id()
                     },
-                    "text": "[p]Object... out of limits[/p]",
+                    "text": reference,
                     "name": "Сообщение",
                     "like": 0
                 }
@@ -201,7 +207,7 @@ class TestVisiobasGateClient(unittest.TestCase):
             "groups": [
                 {"id": found["id"]}
             ],
-            "description": "[p]Custom text[/p]"
+            "description": "[p]{} out of limits[/p]".format(topic_title)
         }
         self.client.rq_vdesk_add_topic(data)
 
@@ -214,6 +220,12 @@ class TestVisiobasGateClient(unittest.TestCase):
         self.assertTrue(False)
         self.client.rq_vdesk_add_topic_item(None)
 
+    def test_rq_vdesk_get_topic_by_user(self):
+        topics = self.client.rq_vdesk_get_topic_by_user()
+        self.assertTrue(topics is not None)
+        self.assertTrue(type(topics) is list)
+        for topic in topics:
+            print(topic)
 
 # ERROR 2020-04-19 20:44:09,596 __main__ run      Failed put data: {'79': 'analog-input', '75': 25307.0, '85': '52.13', '846': 200}
 

@@ -13,11 +13,11 @@ class BACnetObject:
     def __str__(self) -> str:
         return self.get(ObjectProperty.OBJECT_TYPE) + " " + self.get(ObjectProperty.OBJECT_PROPERTY_REFERENCE)
 
-    def get(self, object_property: ObjectProperty):
+    def get(self, object_property: ObjectProperty, default=None):
         try:
             return self._data[object_property.id()]
         except:
-            return None
+            return default
 
     def get_property_list(self):
         if self.property_list is not None:
@@ -103,3 +103,9 @@ class BACnetObject:
 
     def get_notification_object(self):
         return self.notification_object
+
+    def get_description(self):
+        return self.get(ObjectProperty.DESCRIPTION, "")
+
+    def get_data(self):
+        return self._data

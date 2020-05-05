@@ -1,9 +1,9 @@
 LOCAL = {
     "host": "http://localhost",
     "port": 8080,
-    "user": "s.gubarev",
-    # '77777'
-    "pwd": "22a4d9b04fe95c9893b41e2fde83a427"
+    "user": "visiobas",
+    # 'visiobas'
+    "pwd": "814E284BF1B02CC2BEB58A587F5FD8DA"
 }
 REMOTE = {
     "host": "https://visiodesk.net",
