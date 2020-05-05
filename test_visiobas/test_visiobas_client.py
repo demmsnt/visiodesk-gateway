@@ -156,11 +156,8 @@ class TestVisiobasGateClient(unittest.TestCase):
         self.assertTrue(type(l) is list)
         print(l)
 
-    def test_rq_vdesk_add_topic_item(self):
+    def test_rq_vdesk_add_topic(self):
         groups = self.client.rq_vdesk_get_groups()
-        # found = next((x for x in server_devices
-        #               if lambda d: d[ObjectProperty.OBJECT_IDENTIFIER.id()] == _device_id), None)
-        #
         found = next(filter(lambda g: g["name"] == "VisioDESK", groups), None)
         if found is None:
             self.assertTrue(False)
@@ -196,7 +193,7 @@ class TestVisiobasGateClient(unittest.TestCase):
                     "type": {
                         "id": visiodesk.ItemType.MESSAGE.id()
                     },
-                    "text": "[p]Custom text[/p]",
+                    "text": "[p]Object... out of limits[/p]",
                     "name": "Сообщение",
                     "like": 0
                 }
@@ -206,7 +203,16 @@ class TestVisiobasGateClient(unittest.TestCase):
             ],
             "description": "[p]Custom text[/p]"
         }
-        self.client.rq_vdesk_add_topic_item(data)
+        self.client.rq_vdesk_add_topic(data)
+
+    def test_rq_vdesk_add_topic_item(self):
+        groups = self.client.rq_vdesk_get_groups()
+        found = next(filter(lambda g: g["name"] == "VisioDESK", groups), None)
+        if found is None:
+            self.assertTrue(False)
+        # unit test not ready
+        self.assertTrue(False)
+        self.client.rq_vdesk_add_topic_item(None)
 
 
 # ERROR 2020-04-19 20:44:09,596 __main__ run      Failed put data: {'79': 'analog-input', '75': 25307.0, '85': '52.13', '846': 200}

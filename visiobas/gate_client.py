@@ -94,7 +94,7 @@ class VisiobasGateClient(VisiobasClient):
         return self.get_json(url)
 
     def rq_vdesk_get_users_by_group(self):
-        # TODO not work
+        # TODO not work?
         url = "{}/vdesk/arm/getUsersByGroup".format(self.get_addr())
         return self.get_json(url)
 
@@ -103,6 +103,7 @@ class VisiobasGateClient(VisiobasClient):
         return self.get_json(url)
 
     def rq_vdesk_get_user_by_id(self, user_id: int):
+        # TODO not work?
         url = "{}/vdesk/arm/getUserById".format(self.get_addr())
         headers = {
             "Content-type": "application/json;charset=UTF-8",
@@ -112,6 +113,14 @@ class VisiobasGateClient(VisiobasClient):
 
     def rq_vdesk_add_topic_item(self, data):
         url = "{}/vdesk/arm/addTopicItem".format(self.get_addr())
+        headers = {
+            "Content-type": "application/json;charset=UTF-8",
+        }
+        js = json.dumps(data)
+        return self.post(url, js, headers=headers)
+
+    def rq_vdesk_add_topic(self, data):
+        url = "{}/vdesk/arm/addTopic".format(self.get_addr())
         headers = {
             "Content-type": "application/json;charset=UTF-8",
         }
