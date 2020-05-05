@@ -26,6 +26,14 @@ python ./create_address_cache.py --devices 200,300
 </pre>
 
 
+__Start data collector by CLI__  
+execute data_collector.py with optional --help to get full cli help  
+*data collector* use *address_cache* file for it own purpose  
+only devices listed in address_cache used for collection  
+<pre>
+python ./data_collector.py
+</pre>
+
 __Visiobas Gateway Server (VGS)__  
 default protocol: __JSON-RPC 2.0__
 
