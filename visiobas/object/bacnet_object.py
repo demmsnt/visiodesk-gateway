@@ -84,10 +84,9 @@ class BACnetObject:
         alarm_values = self.get(ObjectProperty.ALARM_VALUES)
         if alarm_values is None:
             return []
-        try:
-            alarm_values.split(",")
-        except:
-            return []
+        if type(alarm_values) is list:
+            return alarm_values
+        return []
 
     def get_notification_class(self):
         try:

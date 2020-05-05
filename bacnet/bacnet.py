@@ -780,7 +780,7 @@ class StatusFlag:
         self.overridden = False
         self.out_of_service = False
 
-        if status_flag is not None and status_flag is list:
+        if status_flag is not None and type(status_flag) is list:
             try:
                 self.in_alarm = status_flag[0]
                 self.fault = status_flag[1]
