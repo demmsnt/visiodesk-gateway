@@ -151,23 +151,22 @@ class VisiobasNotifier(Thread):
         alarm_values = bacnet_object.get_alarm_values()
         return present_value in alarm_values
 
-    def verify_object_out_of_limit(self, bacnet_object: BACnetObject, data: dict):
-        if bacnet_object.get_event_detection_enable():
-            object_type_code = bacnet_object.get_object_type_code()
-            if object_type_code == ObjectType.ANALOG_INPUT.code() or \
-                    object_type_code == ObjectType.ANALOG_OUTPUT.code() or \
-                    object_type_code == ObjectType.ANALOG_VALUE:
-                return self.verify_analog_object_out_of_limit(bacnet_object, data)
-            elif object_type_code == ObjectType.BINARY_INPUT.code() or \
-                    object_type_code == ObjectType.BINARY_OUTPUT.code() or \
-                    object_type == ObjectType.BINARY_VALUE.code():
-                return self.verify_binary_out_of_limit(bacnet_object, data)
-            elif object_type_code == ObjectType.MULTI_STATE_INPUT.code() or \
-                    object_type_code == ObjectType.MULTI_STATE_OUTPUT.code() or \
-                    object_type_code == ObjectType.MULTI_STATE_VALUE.code():
-                return self.verify_multistate_out_of_limit(bacnet_object, data)
-        else:
+    def verify_if_necessary_object_out_of_limit(self, bacnet_object: BACnetObject, data: dict):
+        if not bacnet_object.get_event_detection_enable():
             return False
+        object_type_code = bacnet_object.get_object_type_code()
+        if object_type_code == ObjectType.ANALOG_INPUT.code() or \
+                object_type_code == ObjectType.ANALOG_OUTPUT.code() or \
+                object_type_code == ObjectType.ANALOG_VALUE:
+            return self.verify_analog_object_out_of_limit(bacnet_object, data)
+        elif object_type_code == ObjectType.BINARY_INPUT.code() or \
+                object_type_code == ObjectType.BINARY_OUTPUT.code() or \
+                object_type == ObjectType.BINARY_VALUE.code():
+            return self.verify_binary_out_of_limit(bacnet_object, data)
+        elif object_type_code == ObjectType.MULTI_STATE_INPUT.code() or \
+                object_type_code == ObjectType.MULTI_STATE_OUTPUT.code() or \
+                object_type_code == ObjectType.MULTI_STATE_VALUE.code():
+            return self.verify_multistate_out_of_limit(bacnet_object, data)
 
     def run(self) -> None:
         while True:
@@ -184,9 +183,10 @@ class VisiobasNotifier(Thread):
                 data = self.collected_data.pop(id)
                 if id in self.bacnet_objects:
                     bacnet_object = self.bacnet_objects[id]
-                    if self.verify_object_out_of_limit(bacnet_object, data):
-                        pass
+                    if self.verify_if_necessary_object_out_of_limit(bacnet_object, data):
                         # present value out of limit
+
+                        pass
                 self.transmitter.push_collected_data(data)
                 self.statistic_verified_object_count += 1
             time.sleep(0.01)
