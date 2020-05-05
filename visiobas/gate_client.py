@@ -111,13 +111,13 @@ class VisiobasGateClient(VisiobasClient):
         }
         return self.get(url, headers=headers)
 
-    def rq_vdesk_add_topic_item(self, data):
-        url = "{}/vdesk/arm/addTopicItem".format(self.get_addr())
-        headers = {
-            "Content-type": "application/json;charset=UTF-8",
-        }
-        js = json.dumps(data)
-        return self.post(url, js, headers=headers)
+    # def rq_vdesk_add_topic_item(self, data):
+    #     url = "{}/vdesk/arm/addTopicItem".format(self.get_addr())
+    #     headers = {
+    #         "Content-type": "application/json;charset=UTF-8",
+    #     }
+    #     js = json.dumps(data)
+    #     return self.post(url, js, headers=headers)
 
     def rq_vdesk_add_topic(self, data):
         url = "{}/vdesk/arm/addTopic".format(self.get_addr())
@@ -135,3 +135,11 @@ class VisiobasGateClient(VisiobasClient):
         if user_id is not None:
             headers["X-ID"] = user_id
         return self.get(url, headers=headers)
+
+    def rq_vdesk_add_topic_items(self, data):
+        url = "{}/vdesk/arm/addTopicItems".format(self.get_addr())
+        headers = {
+            "Content-type": "application/json;charset=UTF-8",
+        }
+        js = json.dumps(data)
+        return self.post(url, js, headers=headers)

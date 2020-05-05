@@ -9,6 +9,8 @@ class BACnetObject:
         self._default_update_interval = 3600
         self.property_list = None
         self.notification_object = None
+        # TODO not sure about store in memory only some status for indicate OFFNORMAL, NORMAL, OUT_OF_SERVICE
+        self.status = None
 
     def __str__(self) -> str:
         return self.get(ObjectProperty.OBJECT_TYPE) + " " + self.get(ObjectProperty.OBJECT_PROPERTY_REFERENCE)
@@ -109,3 +111,6 @@ class BACnetObject:
 
     def get_data(self):
         return self._data
+
+    def get_status_flags(self):
+        return self.get(ObjectProperty.STATUS_FLAGS, [False, False, False, False])

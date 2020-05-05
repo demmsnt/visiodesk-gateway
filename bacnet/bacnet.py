@@ -359,6 +359,14 @@ bacnet_name_map = {
 }
 
 
+class Transition(enum.Enum):
+    TO_OFFNORMAL = 1
+    TO_FAULT = 2
+    TO_NORMAL = 3
+
+    def id(self):
+        return self.value
+
 class ObjectProperty(enum.Enum):
     ACKED_TRANSITIONS = '0'
     ACK_REQUIRED = '1'
@@ -774,18 +782,18 @@ class ObjectType(enum.Enum):
 
 
 class StatusFlag:
-    def __init__(self, status_flag: list = None) -> None:
+    def __init__(self, status_flags: list = None) -> None:
         self.in_alarm = False
         self.fault = False
         self.overridden = False
         self.out_of_service = False
 
-        if status_flag is not None and type(status_flag) is list:
+        if status_flags is not None and type(status_flags) is list:
             try:
-                self.in_alarm = status_flag[0]
-                self.fault = status_flag[1]
-                self.overridden = status_flag[2]
-                self.out_of_service = status_flag[3]
+                self.in_alarm = status_flags[0]
+                self.fault = status_flags[1]
+                self.overridden = status_flags[2]
+                self.out_of_service = status_flags[3]
             except:
                 pass
 

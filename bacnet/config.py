@@ -11,8 +11,5 @@ visiobas_server = {
     'auth': {
         'user': 'visiobas',
         'pwd': '814E284BF1B02CC2BEB58A587F5FD8DA'
-    },
-    'notification': {
-        'group': 'VisioDESK'
     }
 }
