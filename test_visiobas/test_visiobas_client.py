@@ -95,6 +95,42 @@ class TestVisiobasGateClient(unittest.TestCase):
                                                object_type=ObjectType.NOTIFICATION_CLASS)
         self.assertTrue(type(objects) is list)
 
+    def test_rq_vdesk_status_list(self):
+        l = self.client.rq_vdesk_status_list()
+        self.assertTrue(l is not None)
+        self.assertTrue(type(l) is list)
+        print(l)
+
+    def test_rq_vdesk_priorities(self):
+        l = self.client.rq_vdesk_priorities()
+        self.assertTrue(l is not None)
+        self.assertTrue(type(l) is l)
+        print(l)
+
+    def test_rq_vdesk_support_levels(self):
+        l = self.client.rq_vdesk_support_levels()
+        self.assertTrue(l is not None)
+        self.assertTrue(type(l) is list)
+        print(l)
+
+    def test_rq_vdesk_user_types(self):
+        l = self.client.rq_vdesk_user_types()
+        self.assertTrue(l is not None)
+        self.assertTrue(type(l) is list)
+        print(l)
+
+    def test_rq_vdesk_topic_type_items(self):
+        l = self.client.rq_vdesk_topic_type_items()
+        self.assertTrue(l is not None)
+        self.assertTrue(type(l) is list)
+        print(l)
+
+    def test_rq_vdesk_topic_types(self):
+        l = self.client.rq_vdesk_topic_types()
+        self.assertTrue(l is not None)
+        self.assertTrue(type(l) is list)
+        print(l)
+
 
 # ERROR 2020-04-19 20:44:09,596 __main__ run      Failed put data: {'79': 'analog-input', '75': 25307.0, '85': '52.13', '846': 200}
 

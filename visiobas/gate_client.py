@@ -4,6 +4,7 @@ import json
 import logging
 
 
+# TODO why need VisiobasClient or VisiobasGateClient ? move all into VisiobasClient
 class VisiobasGateClient(VisiobasClient):
     def __init__(self, host, port, verify):
         VisiobasClient.__init__(self, host, port, verify=verify)
@@ -63,3 +64,45 @@ class VisiobasGateClient(VisiobasClient):
         }
         js = json.dumps(data)
         return self.post(url, js, headers=headers)
+
+    def rq_vdesk_status_list(self) -> list:
+        url = "{}/vdesk/arm/getStatusList".format(self.get_addr())
+        headers = {
+            "Content-type": "application/json;charset=UTF-8"
+        }
+        return self.get(url, headers=headers)
+
+    def rq_vdesk_priorities(self) -> list:
+        url = "{}/vdesk/arm/getPriorities".format(self.get_addr())
+        headers = {
+            "Content-type": "application/json;charset=UTF-8"
+        }
+        return self.get(url, headers=headers)
+
+    def rq_vdesk_support_levels(self) -> list:
+        url = "{}/vdesk/arm/getSupportLevels".format(self.get_addr())
+        headers = {
+            "Content-type": "application/json;charset=UTF-8"
+        }
+        return self.get(url, headers=headers)
+
+    def rq_vdesk_user_types(self):
+        url = "{}/vdesk/arm/getUserTypes".format(self.get_addr())
+        headers = {
+            "Content-type": "application/json;charset=UTF-8"
+        }
+        return self.get(url, headers=headers)
+
+    def rq_vdesk_topic_type_items(self):
+        url = "{}/vdesk/arm/getTopicItemTypes".format(self.get_addr())
+        headers = {
+            "Content-type": "application/json;charset=UTF-8"
+        }
+        return self.get(url, headers=headers)
+
+    def rq_vdesk_topic_types(self):
+        url = "{}/vdesk/arm/getTopicTypes".format(self.get_addr())
+        headers = {
+            "Content-type": "application/json;charset=UTF-8"
+        }
+        return self.get(url, headers=headers)
