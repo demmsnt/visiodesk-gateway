@@ -1,11 +1,29 @@
 __Python virtual environment__
-<pre>  
-python -m venv visiodesk-gateway/venv
+for Ubuntu users need to install python virtual env module  
+used python3 instead of python because of using python of version 3  
+<pre>
+apt-get install python3-venv
 </pre>
-python environment should be activated
+change director into visiodesk-gateway folder    
+and create virtual env with name __venv__
+<pre>  
+python3 -m venv venv
+</pre>
+python environment should be activated (Windows)  
+execute follow bat file
 <pre>
 visiodesk-gateway/venv/Scripts/activate.bat
 </pre>
+python environment should be activated (Ubuntu)  
+execute follow command
+<pre>
+source venv/bin/activate
+</pre>
+after it terminal before input cursor should display __(venv)__  
+add env variable (Windows) set PYTHONPATH=<visiodesk-gateway dir>  
+add env variable (Ubuntu) export PYTHONPATH=<visiodesk-gateway dir>  
+example set PYTHONPATH=C:\W\element\npp\visiodesk-gateway  
+this is necessary for correct resolve modules search   
 using pip freeze command to output current dependency list and it can be saved into txt file and used later for install all necessary dependencies
 <pre>
 pip freeze > dependencies.txt
