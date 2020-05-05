@@ -1,7 +1,7 @@
 import enum
 
 
-class ItemType(enum):
+class ItemType(enum.Enum):
     IMAGE = 1
     DOCUMENT = 2
     USER = 3
@@ -23,7 +23,7 @@ class ItemType(enum):
         return self.value
 
 
-class TopicType(enum):
+class TopicType(enum.Enum):
     EVENT = 1
     REQUEST = 2
     TASK = 3
@@ -33,23 +33,29 @@ class TopicType(enum):
         return self.value
 
 
-class TopicStatus(enum):
-    NEW = 1
-    ASSIGNED = 2
-    IN_PROGRESS = 3
-    ON_HOLD = 4
-    RESOLVED = 5
-    CLOSED = 6
+class TopicStatus(enum.Enum):
+    NEW = 1, "new"
+    ASSIGNED = 2, "assigned"
+    IN_PROGRESS = 3, "in_progress"
+    ON_HOLD = 4, "on_hold"
+    RESOLVED = 5, "resolved"
+    CLOSED = 6, "closed"
 
     def id(self):
-        return self.value
+        return self.value[0]
+
+    def name(self):
+        return self.value[1]
 
 
-class TopicPriority(enum):
-    LOW = 1,
-    NORM = 2
-    HEED = 3
-    TOP = 4
+class TopicPriority(enum.Enum):
+    LOW = 1, "low"
+    NORM = 2, "norm"
+    HEED = 3, "heed"
+    TOP = 4, "top"
 
     def id(self):
-        return self.value
+        return self.value[0]
+
+    def name(self):
+        return self.value[1]

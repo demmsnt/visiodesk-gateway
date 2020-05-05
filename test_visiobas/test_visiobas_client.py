@@ -7,6 +7,7 @@ import visiobas.visiobas_logging
 from random import randrange
 from test_visiobas import test_config
 from visiobas.object.device import Device
+from visiobas import visiodesk
 
 USING_SERVER = "local"
 
@@ -156,7 +157,57 @@ class TestVisiobasGateClient(unittest.TestCase):
         print(l)
 
     def test_rq_vdesk_add_topic_item(self):
-        self.client.rq_vdesk_add_topic_item()
+        groups = self.client.rq_vdesk_get_groups()
+        # found = next((x for x in server_devices
+        #               if lambda d: d[ObjectProperty.OBJECT_IDENTIFIER.id()] == _device_id), None)
+        #
+        found = next(filter(lambda g: g["name"] == "VisioDESK", groups), None)
+        if found is None:
+            self.assertTrue(False)
+        data = {
+            "name": "ALARM!!!",
+            "topic_type": {
+                "id": visiodesk.TopicType.EVENT.id()
+            },
+            "items": [
+                {
+                    "type": {
+                        "id": visiodesk.ItemType.PRIORITY.id()
+                    },
+                    "priority": {
+                        "id": visiodesk.TopicPriority.HEED.id()
+                    },
+                    "text": visiodesk.TopicPriority.HEED.name(),
+                    "name": "Повышенный",
+                    "like": 0
+                },
+                {
+                    "type": {
+                        "id": visiodesk.ItemType.STATUS.id()
+                    },
+                    "status": {
+                        "id": visiodesk.TopicStatus.NEW.id()
+                    },
+                    "text": visiodesk.TopicStatus.NEW.name(),
+                    "name": "Новая",
+                    "like": 0
+                },
+                {
+                    "type": {
+                        "id": visiodesk.ItemType.MESSAGE.id()
+                    },
+                    "text": "[p]Custom text[/p]",
+                    "name": "Сообщение",
+                    "like": 0
+                }
+            ],
+            "groups": [
+                {"id": found["id"]}
+            ],
+            "description": "[p]Custom text[/p]"
+        }
+        self.client.rq_vdesk_add_topic_item(data)
+
 
 # ERROR 2020-04-19 20:44:09,596 __main__ run      Failed put data: {'79': 'analog-input', '75': 25307.0, '85': '52.13', '846': 200}
 

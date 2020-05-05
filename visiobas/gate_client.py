@@ -115,4 +115,5 @@ class VisiobasGateClient(VisiobasClient):
         headers = {
             "Content-type": "application/json;charset=UTF-8",
         }
-        return self.post(url, data, headers=headers)
+        js = json.dumps(data)
+        return self.post(url, js, headers=headers)
