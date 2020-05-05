@@ -240,20 +240,6 @@ class VisiobasThreadDataCollector(Thread):
             "bacnet_object": bacnet_object
         })
 
-    # def add_object(self, device_id, object_type_code, object_id, update_interval=3600, object_reference=None):
-    #     # python list append operation should be thread safe
-    #     self.objects.append({
-    #         "device_id": device_id,
-    #         "object_type_code": object_type_code,
-    #         "object_id": object_id,
-    #         "object_reference": object_reference,
-    #         "update_interval": update_interval,
-    #         "original_update_interval": update_interval,
-    #         "time_last_success_pooling": 0,
-    #         # special delay for distribute sensor pooling uniform
-    #         "update_delay": -1
-    #     })
-
     def run(self):
         if self.logger.isEnabledFor(logging.INFO):
             self.logger.info("Collector# {} count of observable objects: {}".format(self.thread_idx, len(self.objects)))
