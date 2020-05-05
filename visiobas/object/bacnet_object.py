@@ -10,6 +10,9 @@ class BACnetObject:
         self.property_list = None
         self.notification_object = None
 
+    def __str__(self) -> str:
+        return self.get(ObjectProperty.OBJECT_TYPE) + " " + self.get(ObjectProperty.OBJECT_PROPERTY_REFERENCE)
+
     def get(self, object_property: ObjectProperty):
         try:
             return self._data[object_property.id()]

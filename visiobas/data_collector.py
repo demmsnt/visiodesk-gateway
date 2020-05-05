@@ -5,6 +5,7 @@ from pathlib import Path
 from threading import Thread
 from random import randint
 from typing import Optional, Callable, Any, Iterable, Mapping
+import argparse
 
 import bacnet.config
 import bacnet.config
@@ -181,10 +182,19 @@ class VisiobasNotifier(Thread):
             ids = list(self.collected_data.keys())
             for id in ids:
                 data = self.collected_data.pop(id)
+
+                # process status flags
+                # {IN_ALARM, FAULT, OVERRIDDEN, OUT_OF_SERVICE}
+                # IN_ALARM logical FALSE (0) if the Event_State property has a value of NORMAL, otherwise TRUE (1)
+                # FAULT logical TRUE (1) if the reliability property is present and does not have a value of NO_FAULT_DETECTED otherwise FALSE (0)
+                # OVERRIDEN logical TRUE (1) if the point has been overriden by some mechanism local to the BACnet DEvice, otherwise FALSE (0)
+                # OUT_OF_SERVICE logical TRUE (1) if Out_Of_Service property has a value of TRUE otherwise FALSE (0)
+
                 if id in self.bacnet_objects:
                     bacnet_object = self.bacnet_objects[id]
                     if self.verify_if_necessary_object_out_of_limit(bacnet_object, data):
                         # present value out of limit
+                        # data[]
 
                         pass
                 self.transmitter.push_collected_data(data)
@@ -315,6 +325,10 @@ class VisiobasThreadDataCollector(Thread):
 if __name__ == '__main__':
     initialize_logging()
     logger = logging.getLogger('visiobas.data_collector')
+    argparser = argparse.ArgumentParser()
+    argparser.add_argument("--device", type=int)
+    argparser.add_argument("--object", type=int)
+    args = argparser.parse_args()
 
     address_cache_path = bacnet.config.address_cache_path
     if not Path(address_cache_path).is_file():
@@ -362,6 +376,10 @@ if __name__ == '__main__':
             # devices with different port value can be collected independently
             for address_cache_device in address_cache_devices:
                 _device_id = address_cache_device['id']
+                if 'device' in args:
+                    if not args.device == _device_id:
+                        continue
+
                 host = address_cache_device['host']
                 port = address_cache_device['port']
                 server_device = None
@@ -429,10 +447,10 @@ if __name__ == '__main__':
                                                                                        device.get_id(),
                                                                                        object_type,
                                                                                        object_ids))
-                        # for debug
-                        # objects = list(filter(lambda x : x[ObjectProperty.OBJECT_IDENTIFIER.id()] == 23902, objects))
-                        # if len(objects) == 1:
-                        #    print(BACnetObject(objects[0]).get_update_interval())
+
+                        if 'object' in args:
+                            objects = list(filter(
+                                lambda x: x[ObjectProperty.OBJECT_IDENTIFIER.id()] == args.object, objects))
 
                         # collect map of bacnet object and link reference with notification class object
                         for o in objects:
