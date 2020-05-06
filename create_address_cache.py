@@ -26,6 +26,7 @@ if __name__ == "__main__":
     if args.devices == "":
         logger.error("--devices request list of devices separated by comma ','")
         print_help()
+        exit(0)
     devices = [int(x) for x in args.devices.split(",")]
     if logger.isEnabledFor(logging.DEBUG):
         logger.debug("create address cache for devices: {}".format(devices))
