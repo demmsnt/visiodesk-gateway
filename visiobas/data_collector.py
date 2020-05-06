@@ -167,8 +167,13 @@ class VisiobasNotifier(Thread):
     def __create_topic(self, group_id: int, bacnet_object: BACnetObject):
         description = bacnet_object.get_description()
         reference = bacnet_object.get_object_reference()
+
+        # родительская папка (description родительской папки)
         topic_title = description if description else reference
+
+        # аварийный текст "Значение вышло за пределы к"
         topic_description = "[p]{} OUT OF LIMITS[/p]".format(topic_title)
+
         data = {
             "name": topic_title,
             "topic_type": {"id": visiodesk.TopicType.EVENT.id()},
@@ -294,9 +299,6 @@ class VisiobasDataVerifier(Thread):
         try:
             id = data[ObjectProperty.OBJECT_IDENTIFIER.id()]
             self.collected_data[id] = data
-            # _device_id = data[ObjectProperty.DEVICE_ID.id()]
-            # if _device_id not in self.device_ids:
-            #    self.device_ids.append(_device_id)
         except:
             self.logger.error("Failed put collected data: {}".format(data))
             self.logger.error(traceback.format_exc())

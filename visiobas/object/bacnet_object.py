@@ -114,3 +114,6 @@ class BACnetObject:
 
     def get_status_flags(self):
         return self.get(ObjectProperty.STATUS_FLAGS, [False, False, False, False])
+
+    def get_reliability(self):
+        return self.get(ObjectProperty.RELIABILITY, "")
