@@ -20,12 +20,12 @@ def print_help():
 if __name__ == "__main__":
     initialize_logging()
     logger = logging.getLogger(__name__)
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--devices', type=str, default="")
+    parser = argparse.ArgumentParser(description="create address_cache file with table of BACnet devices using data from remote server")
+    parser.add_argument('--devices', type=str, default="", help="list of devices id separated by comma")
     args = parser.parse_args()
     if args.devices == "":
         logger.error("--devices request list of devices separated by comma ','")
-        print_help()
+        parser.print_help()
         exit(0)
     devices = [int(x) for x in args.devices.split(",")]
     if logger.isEnabledFor(logging.DEBUG):
