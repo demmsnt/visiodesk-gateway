@@ -1,2 +1,2 @@
 @echo off
-type resource\bacrpm-emulation-test.txt
+type resource\bacrpm-emulation-apdu-timeout.txt
