@@ -24,6 +24,7 @@ class BACnetParserTest(unittest.TestCase):
             self.assertTrue(object is not None)
             self.assertTrue(object[ObjectProperty.OBJECT_IDENTIFIER.id()], 3000022)
             self.assertTrue(object[ObjectProperty.OBJECT_TYPE.id()], "analog-input")
+            self.assertTrue(object[ObjectProperty.RELIABILITY.id()], "no-fault-detected")
 
     def test_bacwi_parser(self):
         path = "{}/resource/address_cache".format(os.path.dirname(os.path.abspath(__file__)))
