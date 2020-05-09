@@ -1,7 +1,7 @@
-from subprocess import Popen, PIPE
-from bacnet.parser import BACnetParser
 import logging
-from pathlib import Path
+from subprocess import Popen, PIPE
+
+from bacnet.parser import BACnetParser
 
 
 class BACrpmSlicer:
@@ -12,6 +12,7 @@ class BACrpmSlicer:
         self.config = config
         self.parser = BACnetParser()
         self.logger = logging.getLogger('bacnet.slicer')
+        self.execute_bacrp_on_fail_bacrpm = False
 
     def execute(self, read_app: str, **kwargs):
         if read_app == "bacrp":
@@ -20,10 +21,15 @@ class BACrpmSlicer:
                               object_id=kwargs.get("object_id"),
                               fields=kwargs.get("fields"))
         elif read_app == "bacrpm":
-            self.execute_bacrpm(device_id=kwargs.get("device_id"),
-                                object_type_code=kwargs.get("object_type_code"),
-                                object_id=kwargs.get("object_id"),
-                                fields=kwargs.get("fields"))
+            data = self.execute_bacrpm(device_id=kwargs.get("device_id"),
+                                       object_type_code=kwargs.get("object_type_code"),
+                                       object_id=kwargs.get("object_id"),
+                                       fields=kwargs.get("fields"))
+            if len(data) == 0 and self.execute_bacrp_on_fail_bacrpm:
+                return self.execute_barp(device_id=kwargs.get("device_id"),
+                                         object_type_code=kwargs.get("object_type_code"),
+                                         object_id=kwargs.get("object_id"),
+                                         fields=kwargs.get("fields"))
         else:
             raise Exception("Unsupported slicer read app: {}".format(read_app))
 
@@ -48,10 +54,11 @@ class BACrpmSlicer:
                 self.logger.debug("bacrp output:\n{}".format(output))
                 self.logger.debug("exit code: {}".format(exit_code))
             try:
-                return self.parser.parse_bacrp(output)
+                self.parser.parse_bacrp(output, field, data)
             except Exception as e:
                 self.logger.error("Failed parse bacrpm: {}".format(e))
                 self.logger.error("Failed parser: {}".format(output))
+        return data
 
     def execute_bacrpm(self, device_id: int, object_type_code: int, object_id: int, fields: list):
         path = self.config["bacrpm"]
