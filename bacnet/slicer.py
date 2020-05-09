@@ -17,9 +17,9 @@ class BACnetSlicer:
     def execute(self, read_app: str, **kwargs):
         if read_app == "bacrp":
             return self.execute_barp(device_id=kwargs.get("device_id"),
-                              object_type_code=kwargs.get("object_type_code"),
-                              object_id=kwargs.get("object_id"),
-                              fields=kwargs.get("fields"))
+                                     object_type_code=kwargs.get("object_type_code"),
+                                     object_id=kwargs.get("object_id"),
+                                     fields=kwargs.get("fields"))
         elif read_app == "bacrpm":
             data = self.execute_bacrpm(device_id=kwargs.get("device_id"),
                                        object_type_code=kwargs.get("object_type_code"),
@@ -31,7 +31,11 @@ class BACnetSlicer:
                                          object_id=kwargs.get("object_id"),
                                          fields=kwargs.get("fields"))
         else:
-            raise Exception("Unsupported slicer read app: {}".format(read_app))
+            self.logger.warning("Using default read app")
+            return self.execute_barp(device_id=kwargs.get("device_id"),
+                                     object_type_code=kwargs.get("object_type_code"),
+                                     object_id=kwargs.get("object_id"),
+                                     fields=kwargs.get("fields"))
 
     def execute_barp(self, device_id: int, object_type_code: int, object_id: int, fields: list):
         path = self.config["bacrp"]

@@ -1,12 +1,11 @@
 from pathlib import Path
 
 bacnet_stack_path = Path("/W/element/npp/visiodesk-gateway/test_visiobas")
-bacrmp_app_path = bacnet_stack_path / "bacrpm.exe"
 address_cache_path = bacnet_stack_path / "resource" / "address_cache"
 
 visiobas_slicer = {
-    "bacrp": bacnet_stack_path / "bacrp.exe",
-    "bacrpm": bacnet_stack_path / "bacrpm.exe"
+    "bacrp": bacnet_stack_path / "bacrp",
+    "bacrpm": bacnet_stack_path / "bacrpm"
 }
 
 visiobas_server = {
