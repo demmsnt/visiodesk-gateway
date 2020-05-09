@@ -1,0 +1,1 @@
+(analog-input, 3000022)

@@ -2,6 +2,7 @@ import enum
 import math
 import logging
 from bacnet.bacnet import bacnet_name_map
+from bacnet.bacnet import ObjectProperty
 
 
 class TokenType(enum.Enum):
@@ -191,7 +192,7 @@ class PrintableTokenParser(TokenParser):
             return None
         if not c.isprintable():
             return None
-        value = ""+c
+        value = "" + c
         c = self.char_reader.read(skip_whitespace=False)
         while c is not None and c.isprintable():
             try:
@@ -561,6 +562,56 @@ class PairsExtractor:
 class BACnetParser:
     def __init__(self):
         self.logger = logging.getLogger('bacnet.parser')
+
+    def parse_bacrp(self, text, property: ObjectProperty = None, object: dict = None):
+        if "BACnet Error: property: unknown-property" in text:
+            return None
+
+        char_reader = CharReader(text)
+        tokens_extractor = TokensExtractor(char_reader)
+        tokens = tokens_extractor.extract_tokens()
+        result = None
+        value_writen = None
+        for token in tokens:
+            if result is None and token.type == TokenType.OPEN_BRACE:
+                result = []
+                continue
+            if result is None and token.type == TokenType.OPEN_GROUP:
+                result = []
+                continue
+            if result is None and token.type == TokenType.OPEN_TUPLE:
+                result = []
+                continue
+            value = None
+            if token.type == TokenType.NULL:
+                value = None
+                value_writen = True
+            elif token.type == TokenType.STRING:
+                value = token.value
+                value_writen = True
+            elif token.type == TokenType.NUMBER:
+                value = token.value
+                value_writen = True
+            elif token.type == TokenType.TRUE or token.type == TokenType.FALSE:
+                value = token.value
+                value_writen = True
+
+            if value_writen:
+                if type(result) == list:
+                    result.append(value)
+                else:
+                    result = value
+                    break
+                value_writen = False
+        if property is not None and object is not None:
+            if property == ObjectProperty.OBJECT_IDENTIFIER and \
+                    type(result) == list and \
+                    len(result) == 2:
+                object[ObjectProperty.OBJECT_TYPE.id()] = result[0]
+                object[ObjectProperty.OBJECT_IDENTIFIER.id()] = int(result[1])
+            elif result is not None:
+                object[property.id()] = result
+        return result
 
     def parse_bacrpm(self, text):
         char_reader = CharReader(text)

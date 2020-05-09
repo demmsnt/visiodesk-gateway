@@ -13,6 +13,48 @@ class BACnetParserTest(unittest.TestCase):
         visiobas.visiobas_logging.initialize_logging()
         self.logger = logging.getLogger(__name__)
 
+    def test_bacrp_parser(self):
+        parser = BACnetParser()
+        object = {}
+        path = "{}/resource/bacrp_reliability.txt".format(os.path.dirname(os.path.abspath(__file__)))
+        with open(path, "r") as file:
+            parser.parse_bacrp(file.read(), ObjectProperty.RELIABILITY, object)
+
+        path = "{}/resource/bacrp_analog_value_present_value.txt".format(os.path.dirname(os.path.abspath(__file__)))
+        with open(path, "r") as file:
+            parser.parse_bacrp(file.read(), ObjectProperty.PRESENT_VALUE, object)
+
+        path = "{}/resource/bacrp_description.txt".format(os.path.dirname(os.path.abspath(__file__)))
+        with open(path, "r") as file:
+            parser.parse_bacrp(file.read(), ObjectProperty.DESCRIPTION, object)
+
+        path = "{}/resource/bacrp_object_identifier.txt".format(os.path.dirname(os.path.abspath(__file__)))
+        with open(path, "r") as file:
+            parser.parse_bacrp(file.read(), ObjectProperty.OBJECT_IDENTIFIER, object)
+
+        path = "{}/resource/bacrp_out_of_service.txt".format(os.path.dirname(os.path.abspath(__file__)))
+        with open(path, "r") as file:
+            parser.parse_bacrp(file.read(), ObjectProperty.OUT_OF_SERVICE, object)
+
+        path = "{}/resource/bacrp_status_flags.txt".format(os.path.dirname(os.path.abspath(__file__)))
+        with open(path, "r") as file:
+            parser.parse_bacrp(file.read(), ObjectProperty.STATUS_FLAGS, object)
+
+        self.assertNotIn(ObjectProperty.RELIABILITY.id(), object)
+        self.assertIn(ObjectProperty.PRESENT_VALUE.id(), object)
+        self.assertIn(ObjectProperty.DESCRIPTION.id(), object)
+        self.assertIn(ObjectProperty.OBJECT_IDENTIFIER.id(), object)
+        self.assertIn(ObjectProperty.OBJECT_TYPE.id(), object)
+        self.assertIn(ObjectProperty.OUT_OF_SERVICE.id(), object)
+        self.assertIn(ObjectProperty.STATUS_FLAGS.id(), object)
+
+        self.assertEqual(object[ObjectProperty.PRESENT_VALUE.id()], 1)
+        self.assertEqual(object[ObjectProperty.DESCRIPTION.id()], '""')
+        self.assertEqual(object[ObjectProperty.OBJECT_IDENTIFIER.id()], 3000022)
+        self.assertEqual(object[ObjectProperty.OBJECT_TYPE.id()], "analog-input")
+        self.assertEqual(object[ObjectProperty.OUT_OF_SERVICE.id()], False)
+        self.assertEqual(object[ObjectProperty.STATUS_FLAGS.id()], [False, False, False, False])
+
     def test_apdu_timeout(self):
         path = "{}/resource/bacrpm-emulation-apdu-timeout.txt".format(os.path.dirname(os.path.abspath(__file__)))
         self.logger.debug("reading test_visiobas file: {}".format(path))
@@ -23,7 +65,6 @@ class BACnetParserTest(unittest.TestCase):
             object = parser.parse_bacrpm(text)
             self.assertTrue(object is not None)
             self.assertTrue(len(object) == 0)
-
 
     def test_bacrpm_parser(self):
         path = "{}/resource/bacrpm.txt".format(os.path.dirname(os.path.abspath(__file__)))
@@ -74,6 +115,7 @@ class BACnetParserTest(unittest.TestCase):
         self.assertTrue(devices[0]["id"] == 200)
         self.assertTrue(devices[0]["host"] == "10.21.80.12")
         self.assertTrue(devices[0]["port"] == 47808)
+
 
 if __name__ == '__main__':
     unittest.main()

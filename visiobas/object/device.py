@@ -47,3 +47,19 @@ class Device(BACnetObject):
         if self.configuration_files is None:
             self.configuration_files = {}
         self.configuration_files['port'] = port
+
+    def get_read_app(self):
+        configuration_files = self.get_configuration_files()
+        if configuration_files is None:
+            return None
+        if "read" not in configuration_files:
+            return None
+        return configuration_files["read"]
+
+    def get_write_app(self):
+        configuration_files = self.get_configuration_files()
+        if configuration_files is None:
+            return None
+        if "write" not in configuration_files:
+            return None
+        return configuration_files["write"]

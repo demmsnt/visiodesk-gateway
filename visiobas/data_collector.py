@@ -385,11 +385,13 @@ class VisiobasThreadDataCollector(Thread):
     def __init__(self,
                  thread_idx: int,
                  verifier: VisiobasDataVerifier,
+                 bacnet_objects: dict,
                  period: float = 0.01):
         super().__init__()
         self.thread_idx = thread_idx
         self.objects = []
         self.verifier = verifier
+        self.bacnet_objects = bacnet_objects
         # self.transmitter = transmitter
         self.logger = logging.getLogger('visiobas.data_collector.collector')
         self.period = period
@@ -405,6 +407,11 @@ class VisiobasThreadDataCollector(Thread):
         _type_code = bacnet_object.get_object_type_code()
         _update_interval = bacnet_object.get_update_interval()
         _reference = bacnet_object.get_object_reference()
+        _read_app = None
+        if _device_id in self.bacnet_objects:
+            device = self.bacnet_objects[_device_id]
+            if device is not None:
+                _read_app = device.get_read_app()
         self.objects.append({
             "device_id": _device_id,
             "object_type_code": _type_code,
@@ -415,7 +422,8 @@ class VisiobasThreadDataCollector(Thread):
             "time_last_success_pooling": 0,
             # special delay for make uniform distribute of sensors pooling
             "update_delay": -1,
-            "bacnet_object": bacnet_object
+            "bacnet_object": bacnet_object,
+            "read_app": _read_app
         })
 
     def run(self):
@@ -430,7 +438,7 @@ class VisiobasThreadDataCollector(Thread):
                     self.logger.info(
                         "Statistic parsed and push for verification: {}, rate: {:d} object / sec".format(count, rate))
 
-            slicer = BACrpmSlicer(bacnet.config.bacrmp_app_path)
+            slicer = BACrpmSlicer(bacnet.config.visiobas_slider)
             now = time.time()
             for _object in self.objects:
                 try:
@@ -441,6 +449,7 @@ class VisiobasThreadDataCollector(Thread):
                     object_type_code = _object["object_type_code"]
                     object_id = _object["object_id"]
                     object_reference = _object["object_reference"]
+                    read_app = _object["read_app"]
                     fields = [
                         ObjectProperty.OUT_OF_SERVICE.id(),
                         ObjectProperty.PRESENT_VALUE.id(),
@@ -456,7 +465,14 @@ class VisiobasThreadDataCollector(Thread):
                         _object["update_interval"] = _object["update_delay"] \
                             if _object["update_delay"] > 0 else _object["original_update_interval"]
 
-                        data = slicer.execute(device_id, object_type_code, object_id, fields)
+                        # execute BAC0 or other app
+                        data = slicer.execute(read_app,
+                                              device_id=device_id,
+                                              object_type_code=object_type_code,
+                                              object_id=object_id,
+                                              fields=fields)
+                        #
+
                         _object["time_last_success_pooling"] = time.time()
                         # prepare collected data and store to be transmitted to server
                         if object_reference is not None:
@@ -572,6 +588,7 @@ if __name__ == '__main__':
                 if port not in port_devices:
                     port_devices[port] = []
                 port_devices[port].append(server_device)
+                bacnet_objects[server_device.get_id()] = server_device
 
             thread_count = len(port_devices)
 
@@ -630,7 +647,7 @@ if __name__ == '__main__':
                             bacnet_objects[o[ObjectProperty.OBJECT_IDENTIFIER.id()]] = bacnet_object
                         data_collector_objects += objects
 
-                collector = VisiobasThreadDataCollector(thread_idx, verifier)
+                collector = VisiobasThreadDataCollector(thread_idx, verifier, bacnet_objects)
                 if logger.isEnabledFor(logging.INFO):
                     _device_ids = [x.get_id() for x in _devices]
                     logger.info("Collector# {} collect devices: {}".format(thread_idx, _device_ids))
