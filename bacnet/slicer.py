@@ -17,7 +17,7 @@ class BACnetSlicer:
         self.execute_bacrp_on_fail_bacrpm = False
 
     def __execute_app(self, args, cwd):
-        cp = subprocess.run(args, stdout=PIPE, stderr=PIPE, cwd=cwd)
+        cp = subprocess.run(args, stdout=PIPE, stderr=PIPE, cwd=str(cwd))
         output = cp.stdout.decode('ascii')
         # command = " ".join([
         #     str(path),
