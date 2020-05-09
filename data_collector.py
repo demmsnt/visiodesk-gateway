@@ -567,6 +567,12 @@ if __name__ == '__main__':
             server_devices = client.rq_devices()
             server_devices = list(
                 filter(lambda x: x[ObjectProperty.OBJECT_IDENTIFIER.id()] in device_ids, server_devices))
+            for o in server_devices:
+                bacnet_objects[o[ObjectProperty.OBJECT_IDENTIFIER.id()]] = Device(o)
+                if logger.isEnabledFor(logging.DEBUG):
+                    logger.debug("append Device object into bacnet_objects container: {}"
+                                 .format(bacnet_objects[o[ObjectProperty.OBJECT_IDENTIFIER.id()]]))
+
             if not len(device_ids) == len(server_devices):
                 logger.warning("Not all bacwi table devices exist on server")
                 for address_cache_device in address_cache_devices:
@@ -581,7 +587,7 @@ if __name__ == '__main__':
             # devices with different port value can be collected independently
             for address_cache_device in address_cache_devices:
                 _device_id = address_cache_device['id']
-                if 'device' in args and args.device is not None:
+                if args.device is not None:
                     if not args.device == _device_id:
                         continue
 
@@ -613,7 +619,7 @@ if __name__ == '__main__':
                 if port not in port_devices:
                     port_devices[port] = []
                 port_devices[port].append(server_device)
-                bacnet_objects[server_device.get_id()] = server_device
+                # bacnet_objects[server_device.get_id()] = server_device
 
             thread_count = len(port_devices)
 

@@ -6,7 +6,7 @@ def initialize_logging():
     logging.basicConfig(
         format='%(levelname)s %(asctime)-15s %(name)s %(funcName)-8s %(message)s',
         filename='visiobas.log',
-        level=logging.INFO)
+        level=logging.DEBUG)
 
     level = logging.DEBUG
     console = logging.StreamHandler(sys.stdout)
@@ -26,9 +26,9 @@ def initialize_logging():
         logger.addHandler(console)
         logger.setLevel(level)
 
-    loggers['bacnet.parser'].setLevel(logging.DEBUG)
-    loggers['bacnet.slicer'].setLevel(logging.DEBUG)
-    loggers['visiobas.data_collector'].setLevel(logging.INFO)
-    loggers['visiobas.data_collector.notifier'].setLevel(logging.INFO)
-    loggers['visiobas.data_collector.collector'].setLevel(logging.INFO)
-    loggers['visiobas.data_collector.transmitter'].setLevel(logging.INFO)
+    # loggers['bacnet.parser'].setLevel(logging.DEBUG)
+    # loggers['bacnet.slicer'].setLevel(logging.DEBUG)
+    # loggers['visiobas.data_collector'].setLevel(logging.INFO)
+    # loggers['visiobas.data_collector.notifier'].setLevel(logging.INFO)
+    # loggers['visiobas.data_collector.collector'].setLevel(logging.INFO)
+    # loggers['visiobas.data_collector.transmitter'].setLevel(logging.INFO)
