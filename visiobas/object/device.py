@@ -48,6 +48,11 @@ class Device(BACnetObject):
             self.configuration_files = {}
         self.configuration_files['port'] = port
 
+    def set_read_app(self, read_app):
+        if self.configuration_files is None:
+            self.configuration_files = {}
+        self.configuration_files["read"] = read_app
+
     def get_read_app(self):
         configuration_files = self.get_configuration_files()
         if configuration_files is None:

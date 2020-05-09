@@ -532,6 +532,7 @@ if __name__ == '__main__':
     argparser.add_argument("--enable_verifier", type=int, default=1)
     argparser.add_argument("--enable_notifier", type=int, default=1)
     argparser.add_argument("--enable_transmitter", type=int, default=1)
+    argparser.add_argument("--read_app", type=str)
     args = argparser.parse_args()
 
     address_cache_path = bacnet.config.address_cache_path
@@ -650,6 +651,9 @@ if __name__ == '__main__':
                 _devices = port_devices[port]
                 data_collector_objects = []
                 for device in _devices:
+                    if args.read_app is not None:
+                        device.set_read_app(args.read_app)
+
                     if device.get_read_app() is None:
                         logger.error("Device: {} read app not specified, ignore collecting data from device".format(
                             device.get_id()))
