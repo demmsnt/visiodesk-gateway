@@ -20,10 +20,23 @@ class BACnetParserTest(unittest.TestCase):
         slicer = BACnetSlicer(bacnet.config.visiobas_slicer)
         data = slicer.execute_barp(200, ObjectType.ANALOG_INPUT.id(), 23003, [
             ObjectProperty.PRESENT_VALUE.id(),
-            ObjectProperty.STATUS_FLAGS.id()
+            ObjectProperty.STATUS_FLAGS.id(),
+            ObjectProperty.OBJECT_IDENTIFIER.id()
         ])
         self.assertIn(ObjectProperty.PRESENT_VALUE.id(), data)
         self.assertIn(ObjectProperty.STATUS_FLAGS.id(), data)
+        self.assertEqual(data[ObjectProperty.OBJECT_IDENTIFIER.id()], 23003)
+
+    def test_bacrpm_slicer(self):
+        slicer = BACnetSlicer(bacnet.config.visiobas_slicer)
+        data = slicer.execute_bacrpm(200, ObjectType.ANALOG_INPUT.id(), 23003, [
+            ObjectProperty.PRESENT_VALUE.id(),
+            ObjectProperty.STATUS_FLAGS.id(),
+            ObjectProperty.OBJECT_IDENTIFIER.id()
+        ])
+        self.assertIn(ObjectProperty.PRESENT_VALUE.id(), data)
+        self.assertIn(ObjectProperty.STATUS_FLAGS.id(), data)
+        self.assertEqual(data[ObjectProperty.OBJECT_IDENTIFIER.id()], 23003)
 
     def test_bacrp_parser(self):
         parser = BACnetParser()
