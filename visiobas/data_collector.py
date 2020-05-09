@@ -87,11 +87,12 @@ class VisiobasTransmitter(Thread):
                 _objects = []
                 for _id in object_ids_group_by_device:
                     try:
-                        _bacnet_object = self.collected_data.pop(_id)
+                        object = self.collected_data.pop(_id)
                         # send only necessary fields
                         _data = {}
                         for field in self.send_fields:
-                            _data[field] = _bacnet_object[field]
+                            if field in object:
+                                _data[field] = object[field]
                         _objects.append(_data)
                     except:
                         self.logger.error(traceback.format_exc())
