@@ -613,6 +613,8 @@ class BACnetParser:
                 object[ObjectProperty.OBJECT_IDENTIFIER.id()] = int(result[1])
             elif result is not None:
                 object[property_id] = result
+        if self.logger.isEnabledFor(logging.DEBUG):
+            self.logger.debug("read object: {}".format(str(object)))
         return result
 
     def parse_bacrpm(self, text):

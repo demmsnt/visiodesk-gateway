@@ -51,8 +51,9 @@ class BACnetSlicer:
             (output, err) = process.communicate()
             exit_code = process.wait()
             if self.logger.isEnabledFor(logging.DEBUG):
-                self.logger.debug("bacrp output:\n{}".format(output))
-                self.logger.debug("exit code: {}".format(exit_code))
+                self.logger.debug("bacrp output: {}".format(output))
+                if not exit_code == 0:
+                    self.logger.debug("exit code: {}".format(exit_code))
             try:
                 self.parser.parse_bacrp(output, field, data)
             except Exception as e:
