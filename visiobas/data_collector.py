@@ -483,7 +483,7 @@ class VisiobasThreadDataCollector(Thread):
                                 object_type_code == ObjectType.ANALOG_VALUE.code():
                             data[ObjectProperty.PRESENT_VALUE.id()] = float(data[ObjectProperty.PRESENT_VALUE.id()])
                         # convert present value to int
-                        if object_type_code == ObjectType.MULTI_STATE_INPUT.code() or \
+                        elif object_type_code == ObjectType.MULTI_STATE_INPUT.code() or \
                                 object_type_code == ObjectType.MULTI_STATE_OUTPUT.code() or \
                                 object_type_code == ObjectType.MULTI_STATE_VALUE.code():
                             data[ObjectProperty.PRESENT_VALUE.id()] = int(
