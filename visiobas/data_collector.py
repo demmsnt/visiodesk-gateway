@@ -4,7 +4,6 @@ import traceback
 from pathlib import Path
 from threading import Thread
 from random import randint
-from typing import Optional, Callable, Any, Iterable, Mapping
 import argparse
 
 import bacnet.config
@@ -49,8 +48,15 @@ class VisiobasTransmitter(Thread):
         self.statistic_log_period = 10
         self.statistic_send_start = time.time()
         self.statistic_period_start = time.time()
+        self.enabled = True
+
+    def set_enable(self, enabled):
+        self.enabled = enabled
 
     def push_collected_data(self, data: dict):
+        if not self.enabled:
+            return
+
         try:
             _id = data[ObjectProperty.OBJECT_IDENTIFIER.id()]
             _device_id = data[ObjectProperty.DEVICE_ID.id()]
@@ -117,8 +123,12 @@ class VisiobasNotifier(Thread):
         self.collected_data = {}
         self.logger = logging.getLogger('visiobas.data_collector.notifier')
         self.notification_groups = {}
+        self.enabled = True
         # self.notification_group_name = notification_group_name
         # self.notification_group_id = self.__find_notification_group_id()
+
+    def set_enable(self, enable):
+        self.enabled = enable
 
     def get_notification_recipients(self, notification_class_id):
         try:
@@ -129,6 +139,9 @@ class VisiobasNotifier(Thread):
         return None
 
     def push_collected_data(self, data, transition: Transition):
+        if not self.enabled:
+            return
+
         try:
             id = data[ObjectProperty.OBJECT_IDENTIFIER.id()]
             self.collected_data[id] = data
@@ -290,13 +303,20 @@ class VisiobasDataVerifier(Thread):
         self.collected_data = {}
         self.bacnet_objects = bacnet_objects
         self.client = client
+        self.enabled = True
         # statistic logging
         self.statistic_verified_object_count = 0
         self.statistic_log_period = 10
         self.statistic_start = time.time()
         self.statistic_period_start = time.time()
 
+    def set_enable(self, enabled):
+        self.enabled = enabled
+
     def push_collected_data(self, data: dict):
+        if not self.enabled:
+            return
+
         try:
             id = data[ObjectProperty.OBJECT_IDENTIFIER.id()]
             self.collected_data[id] = data
@@ -509,6 +529,9 @@ if __name__ == '__main__':
     argparser = argparse.ArgumentParser()
     argparser.add_argument("--device", type=int)
     argparser.add_argument("--object", type=int)
+    argparser.add_argument("--enable_verifier", type=int, default=1)
+    argparser.add_argument("--enable_notifier", type=int, default=1)
+    argparser.add_argument("--enable_transmitter", type=int, default=1)
     args = argparser.parse_args()
 
     address_cache_path = bacnet.config.address_cache_path
@@ -594,14 +617,17 @@ if __name__ == '__main__':
             thread_count = len(port_devices)
 
             transmitter = VisiobasTransmitter(client)
+            transmitter.set_enable(not args.enable_transmitter == 0)
             transmitter.setDaemon(True)
             transmitter.start()
 
             notifier = VisiobasNotifier(client, bacnet_objects)
+            notifier.set_enable(not args.enable_notifier == 0)
             notifier.setDaemon(True)
             notifier.start()
 
             verifier = VisiobasDataVerifier(client, transmitter, notifier, bacnet_objects)
+            verifier.set_enable(not args.enable_verifier == 0)
             verifier.setDaemon(True)
             verifier.start()
 
@@ -624,6 +650,11 @@ if __name__ == '__main__':
                 _devices = port_devices[port]
                 data_collector_objects = []
                 for device in _devices:
+                    if device.get_read_app() is None:
+                        logger.error("Device: {} read app not specified, ignore collecting data from device".format(
+                            device.get_id()))
+                        continue
+
                     for object_type in object_types:
                         objects = client.rq_device_object(device.get_id(), object_type)
                         if logger.isEnabledFor(logging.DEBUG):
