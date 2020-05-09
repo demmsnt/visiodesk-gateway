@@ -464,9 +464,9 @@ class VisiobasThreadDataCollector(Thread):
                 if time.time() - self.statistic_period_start > self.statistic_log_period:
                     self.statistic_period_start = time.time()
                     count = self.statistic_parsed_object_count
-                    rate = int(count / (time.time() - self.statistic_start))
+                    rate = float(float(count) / (time.time() - self.statistic_start))
                     self.logger.info(
-                        "Statistic parsed and push for verification: {}, rate: {:d} object / sec".format(count, rate))
+                        "Statistic parsed and push for verification: {}, rate: {:f} object / sec".format(count, rate))
 
             slicer = BACnetSlicer(bacnet.config.visiobas_slicer)
             now = time.time()
