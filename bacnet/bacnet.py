@@ -367,6 +367,7 @@ class Transition(enum.Enum):
     def id(self):
         return self.value
 
+
 class ObjectProperty(enum.Enum):
     ACKED_TRANSITIONS = '0'
     ACK_REQUIRED = '1'

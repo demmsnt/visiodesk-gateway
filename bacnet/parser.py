@@ -563,9 +563,11 @@ class BACnetParser:
     def __init__(self):
         self.logger = logging.getLogger('bacnet.parser')
 
-    def parse_bacrp(self, text, property: ObjectProperty = None, object: dict = None):
+    def parse_bacrp(self, text, property_id, object: dict = None):
         if "BACnet Error: property: unknown-property" in text:
             return None
+        if type(property_id) == ObjectProperty:
+            property_id = property_id.id()
 
         char_reader = CharReader(text)
         tokens_extractor = TokensExtractor(char_reader)
@@ -603,14 +605,14 @@ class BACnetParser:
                     result = value
                     break
                 value_writen = False
-        if property is not None and object is not None:
-            if property == ObjectProperty.OBJECT_IDENTIFIER and \
+        if property_id is not None and object is not None:
+            if property_id == ObjectProperty.OBJECT_IDENTIFIER.id() and \
                     type(result) == list and \
                     len(result) == 2:
                 object[ObjectProperty.OBJECT_TYPE.id()] = result[0]
                 object[ObjectProperty.OBJECT_IDENTIFIER.id()] = int(result[1])
             elif result is not None:
-                object[property.id()] = result
+                object[property_id] = result
         return result
 
     def parse_bacrpm(self, text):
