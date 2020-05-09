@@ -660,6 +660,8 @@ class BACnetParser:
                 trimmed = line.strip()
                 if trimmed.startswith(';'):
                     continue
+                if len(trimmed) == 0:
+                    continue
                 values = trimmed.split()
                 mac = values[1].split(':')
                 host = "{}.{}.{}.{}".format(int(mac[0], 16), int(mac[1], 16), int(mac[2], 16), int(mac[3], 16))

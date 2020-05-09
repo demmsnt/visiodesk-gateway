@@ -104,6 +104,19 @@ class BACnetParserTest(unittest.TestCase):
             self.assertTrue(object[ObjectProperty.OBJECT_TYPE.id()], "analog-input")
             self.assertTrue(object[ObjectProperty.RELIABILITY.id()], "no-fault-detected")
 
+    def test_bacwi_mria_parser(self):
+        path = "{}/resource/address_cache_mria".format(os.path.dirname(os.path.abspath(__file__)))
+        self.logger.debug("reading test file: {}".format(path))
+        with open(path, "r") as file:
+            text = file.read()
+            self.logger.debug("{} content:\n{}".format(path, text))
+            devices = BACnetParser.parse_bacwi(text)
+            self.assertTrue(len(devices) == 61)
+            self.assertTrue(devices[0]["id"] == 2098210)
+            # 0A:15:AB:2C:BA:C0
+            self.assertTrue(devices[0]["host"] == "10.21.171.44")
+            self.assertTrue(devices[0]["port"] == 47808)
+
     def test_bacwi_parser(self):
         path = "{}/resource/address_cache".format(os.path.dirname(os.path.abspath(__file__)))
         self.logger.debug("reading test file: {}".format(path))
