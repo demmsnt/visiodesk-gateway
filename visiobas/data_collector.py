@@ -557,7 +557,7 @@ if __name__ == '__main__':
             # devices with different port value can be collected independently
             for address_cache_device in address_cache_devices:
                 _device_id = address_cache_device['id']
-                if 'device' in args:
+                if 'device' in args and args.device is not None:
                     if not args.device == _device_id:
                         continue
 
@@ -634,7 +634,7 @@ if __name__ == '__main__':
                                                                                        object_type,
                                                                                        object_ids))
 
-                        if 'object' in args:
+                        if 'object' in args and args.object is not None:
                             objects = list(filter(
                                 lambda x: x[ObjectProperty.OBJECT_IDENTIFIER.id()] == args.object, objects))
 
