@@ -498,7 +498,7 @@ class VisiobasThreadDataCollector(Thread):
                         # execute BAC0 or other app
                         data = slicer.execute(read_app,
                                               device_id=device_id,
-                                              object_type_code=object_type_code,
+                                              object_type=object_type_code,
                                               object_id=object_id,
                                               fields=fields)
                         #

@@ -18,7 +18,7 @@ class BACnetParserTest(unittest.TestCase):
 
     def test_bacrp_slicer(self):
         slicer = BACnetSlicer(bacnet.config.visiobas_slicer)
-        data = slicer.execute_barp(200, ObjectType.ANALOG_INPUT.id(), 23003, [
+        data = slicer.execute_barp(200, ObjectType.ANALOG_INPUT, 23003, [
             ObjectProperty.PRESENT_VALUE.id(),
             ObjectProperty.STATUS_FLAGS.id(),
             ObjectProperty.OBJECT_IDENTIFIER.id()
@@ -29,7 +29,7 @@ class BACnetParserTest(unittest.TestCase):
 
     def test_bacrpm_slicer(self):
         slicer = BACnetSlicer(bacnet.config.visiobas_slicer)
-        data = slicer.execute_bacrpm(200, ObjectType.ANALOG_INPUT.id(), 23003, [
+        data = slicer.execute_bacrpm(200, ObjectType.ANALOG_INPUT, 23003, [
             ObjectProperty.PRESENT_VALUE.id(),
             ObjectProperty.STATUS_FLAGS.id(),
             ObjectProperty.OBJECT_IDENTIFIER.id()

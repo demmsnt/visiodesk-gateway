@@ -56,7 +56,7 @@ class CharReader:
     def read(self, skip_whitespace=True, ignore_eol=True):
         self.seek(self.pos + 1)
         if skip_whitespace:
-            self.skip_whitespace()
+            self.skip_whitespace(ignore_eol=ignore_eol)
         return self.current_char
 
     def seek(self, pos):
