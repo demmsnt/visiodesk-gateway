@@ -573,10 +573,14 @@ if __name__ == '__main__':
                 server_devices = list(
                     filter(lambda x: x[ObjectProperty.OBJECT_IDENTIFIER.id()] == args.device, server_devices))
             for o in server_devices:
-                bacnet_objects[o[ObjectProperty.OBJECT_IDENTIFIER.id()]] = Device(o)
+                device = Device(o)
+                if args.read_app is not None:
+                    device.set_read_app(args.read_app)
+                bacnet_objects[o[ObjectProperty.OBJECT_IDENTIFIER.id()]] = device
                 if logger.isEnabledFor(logging.DEBUG):
-                    logger.debug("append Device object into bacnet_objects container: {}"
-                                 .format(bacnet_objects[o[ObjectProperty.OBJECT_IDENTIFIER.id()]]))
+                    logger.debug("append Device into bacnet_objects container: {}, read_app: '{}'"
+                                 .format(bacnet_objects[o[ObjectProperty.OBJECT_IDENTIFIER.id()]],
+                                         bacnet_objects[o[ObjectProperty.OBJECT_IDENTIFIER.id()]].get_read_app()))
 
             if not len(device_ids) == len(server_devices):
                 logger.warning("Not all bacwi table devices exist on server")
@@ -592,18 +596,27 @@ if __name__ == '__main__':
             # devices with different port value can be collected independently
             for address_cache_device in address_cache_devices:
                 _device_id = address_cache_device['id']
-                host = address_cache_device['host']
-                port = address_cache_device['port']
-                server_device = None
-                for device in server_devices:
-                    if device[ObjectProperty.OBJECT_IDENTIFIER.id()] == _device_id:
-                        server_device = device
-                        break
-                if server_device is None:
+                if _device_id not in bacnet_objects:
+                    logger.warning("Device not found: {}".format(address_cache_device))
                     continue
 
+                server_device = bacnet_objects[_device_id]
+                if not type(server_device) == Device:
+                    logger.warning("Object is not device: {}".format(server_device))
+                    continue
+
+                host = address_cache_device['host']
+                port = address_cache_device['port']
+                # server_device = None
+                # for device in server_devices:
+                #     if device[ObjectProperty.OBJECT_IDENTIFIER.id()] == _device_id:
+                #         server_device = device
+                #         break
+                # if server_device is None:
+                #     continue
+
                 # verify host and port equals on server device and bacwi device table
-                server_device = Device(server_device)
+                # server_device = Device(server_device)
                 if not host == server_device.get_host():
                     logger.warning("Server device {} host ({}) not equal with bacwi device host ({})".
                                    format(server_device.get_id(), server_device.get_host(), host))
@@ -619,8 +632,8 @@ if __name__ == '__main__':
 
                 if port not in port_devices:
                     port_devices[port] = []
+                assert type(server_device) == Device
                 port_devices[port].append(server_device)
-                # bacnet_objects[server_device.get_id()] = server_device
 
             thread_count = len(port_devices)
 
@@ -658,9 +671,6 @@ if __name__ == '__main__':
                 _devices = port_devices[port]
                 data_collector_objects = []
                 for device in _devices:
-                    if args.read_app is not None:
-                        device.set_read_app(args.read_app)
-
                     if device.get_read_app() is None:
                         logger.error("Device: {} read app not specified, ignore collecting data from device".format(
                             device.get_id()))
