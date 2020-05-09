@@ -13,11 +13,14 @@ from bacnet.bacnet import ObjectType
 from bacnet.parser import BACnetParser
 from bacnet.slicer import BACnetSlicer
 from visiobas.gate_client import VisiobasGateClient
-from visiobas.object.device import Device
-from visiobas.object.notification_class import NotificationClass
-from visiobas.visiobas_logging import initialize_logging
+from visiobas.object.bacnet_object import Device
+from visiobas.object.bacnet_object import NotificationClass
 from visiobas.object.bacnet_object import BACnetObject
+from visiobas.visiobas_logging import initialize_logging
 from visiobas import visiodesk
+from bacnet.network import BACnetNetwork
+
+bacnet_network = BACnetNetwork()
 
 
 class VisiobasTransmitter(Thread):
@@ -116,10 +119,10 @@ class VisiobasTransmitter(Thread):
 class VisiobasNotifier(Thread):
     def __init__(self,
                  client: VisiobasGateClient,
-                 bacnet_objects: dict):
+                 bacnet_network: BACnetNetwork):
         super().__init__()
         self.client = client
-        self.bacnet_objects = bacnet_objects
+        self.bacnet_network = bacnet_network
         self.collected_data = {}
         self.logger = logging.getLogger('visiobas.data_collector.notifier')
         self.notification_groups = {}
@@ -132,7 +135,8 @@ class VisiobasNotifier(Thread):
 
     def get_notification_recipients(self, notification_class_id):
         try:
-            notification_class = self.bacnet_objects[notification_class_id]
+            notification_class = self.bacnet_network.find(ObjectType.NOTIFICATION_CLASS,
+                                                          notification_class_id)
             return notification_class.get_recipient_list()
         except:
             self.logger.error("Failed get notification group")
@@ -276,9 +280,13 @@ class VisiobasNotifier(Thread):
             for id in ids:
                 try:
                     data = self.collected_data.pop(id)
-                    if id not in self.bacnet_objects:
+                    object_type = data[ObjectProperty.ObjectProperty.OBJECT_TYPE.id()]
+                    bacnet_object = bacnet_network.find(object_type, id)
+                    if bacnet_object is None:
                         continue
-                    bacnet_object = self.bacnet_objects[id]
+                        # if id not in self.bacnet_objects:
+                        #    continue
+                    # bacnet_object = self.bacnet_objects[id]
                     notification_class = bacnet_object.get_notification_object()
                     if notification_class is None:
                         continue
@@ -406,13 +414,13 @@ class VisiobasThreadDataCollector(Thread):
     def __init__(self,
                  thread_idx: int,
                  verifier: VisiobasDataVerifier,
-                 bacnet_objects: dict,
+                 bacnet_network: BACnetNetwork,
                  period: float = 0.01):
         super().__init__()
         self.thread_idx = thread_idx
         self.objects = []
         self.verifier = verifier
-        self.bacnet_objects = bacnet_objects
+        self.bacnet_network = bacnet_network
         # self.transmitter = transmitter
         self.logger = logging.getLogger('visiobas.data_collector.collector')
         self.period = period
@@ -428,11 +436,12 @@ class VisiobasThreadDataCollector(Thread):
         _type_code = bacnet_object.get_object_type_code()
         _update_interval = bacnet_object.get_update_interval()
         _reference = bacnet_object.get_object_reference()
-        _read_app = None
-        if _device_id in self.bacnet_objects:
-            device = self.bacnet_objects[_device_id]
-            if device is not None:
-                _read_app = device.get_read_app()
+        device = self.bacnet_network.find(ObjectType.DEVICE, _device_id)
+        _read_app = device.get_read_app() if device is not None else None
+        # if _device_id in self.bacnet_objects:
+        #     device = self.bacnet_objects[_device_id]
+        #     if device is not None:
+        #         _read_app = device.get_read_app()
         self.objects.append({
             "device_id": _device_id,
             "object_type_code": _type_code,
@@ -549,7 +558,7 @@ if __name__ == '__main__':
 
         # dict of all collecting bacnet objects
         # key - object id, value - BACnetObject
-        bacnet_objects = {}
+        # bacnet_objects = {}
 
         client = VisiobasGateClient(
             bacnet.config.visiobas_server['host'],
@@ -564,7 +573,8 @@ if __name__ == '__main__':
             # get notification class objects
             notification_class = client.rq_device_object(1, ObjectType.NOTIFICATION_CLASS)
             for o in notification_class:
-                bacnet_objects[o[ObjectProperty.OBJECT_IDENTIFIER.id()]] = NotificationClass(o)
+                bacnet_network.append(NotificationClass(o))
+                # bacnet_objects[o[ObjectProperty.OBJECT_IDENTIFIER.id()]] = NotificationClass(o)
 
             server_devices = client.rq_devices()
             server_devices = list(
@@ -576,11 +586,12 @@ if __name__ == '__main__':
                 device = Device(o)
                 if args.read_app is not None:
                     device.set_read_app(args.read_app)
-                bacnet_objects[o[ObjectProperty.OBJECT_IDENTIFIER.id()]] = device
-                if logger.isEnabledFor(logging.DEBUG):
-                    logger.debug("append Device into bacnet_objects container: {}, read_app: '{}'"
-                                 .format(bacnet_objects[o[ObjectProperty.OBJECT_IDENTIFIER.id()]],
-                                         bacnet_objects[o[ObjectProperty.OBJECT_IDENTIFIER.id()]].get_read_app()))
+                # bacnet_objects[o[ObjectProperty.OBJECT_IDENTIFIER.id()]] = device
+                bacnet_network.append(device)
+                # if logger.isEnabledFor(logging.DEBUG):
+                #     logger.debug("append Device into bacnet_objects container: {}, read_app: '{}'"
+                #                  .format(bacnet_network.find_bacnet_object() bacnet_objects[o[ObjectProperty.OBJECT_IDENTIFIER.id()]],
+                #                          bacnet_objects[o[ObjectProperty.OBJECT_IDENTIFIER.id()]].get_read_app()))
 
             if not len(device_ids) == len(server_devices):
                 logger.warning("Not all bacwi table devices exist on server")
@@ -596,14 +607,16 @@ if __name__ == '__main__':
             # devices with different port value can be collected independently
             for address_cache_device in address_cache_devices:
                 _device_id = address_cache_device['id']
-                if _device_id not in bacnet_objects:
+                server_device = bacnet_network.find(ObjectType.DEVICE, _device_id)
+                if not server_device:
+                    # if _device_id not in bacnet_objects:
                     logger.warning("Device not found: {}".format(address_cache_device))
                     continue
-
-                server_device = bacnet_objects[_device_id]
-                if not type(server_device) == Device:
-                    logger.warning("Object is not device: {}".format(server_device))
-                    continue
+                assert (type(server_device) == Device)
+                # server_device = bacnet_objects[_device_id]
+                # if not type(server_device) == Device:
+                #     logger.warning("Object is not device: {}".format(server_device))
+                #     continue
 
                 host = address_cache_device['host']
                 port = address_cache_device['port']
@@ -632,7 +645,7 @@ if __name__ == '__main__':
 
                 if port not in port_devices:
                     port_devices[port] = []
-                assert type(server_device) == Device
+                # assert type(server_device) == Device
                 port_devices[port].append(server_device)
 
             thread_count = len(port_devices)
@@ -642,12 +655,12 @@ if __name__ == '__main__':
             transmitter.setDaemon(True)
             transmitter.start()
 
-            notifier = VisiobasNotifier(client, bacnet_objects)
+            notifier = VisiobasNotifier(client, bacnet_network)
             notifier.set_enable(not args.enable_notifier == 0)
             notifier.setDaemon(True)
             notifier.start()
 
-            verifier = VisiobasDataVerifier(client, transmitter, notifier, bacnet_objects)
+            verifier = VisiobasDataVerifier(client, transmitter, notifier, bacnet_network)
             verifier.set_enable(not args.enable_verifier == 0)
             verifier.setDaemon(True)
             verifier.start()
@@ -694,22 +707,32 @@ if __name__ == '__main__':
                         for o in objects:
                             bacnet_object = BACnetObject(o)
                             notification_class_id = bacnet_object.get_notification_class()
-                            if not notification_class_id == 0 and notification_class_id in bacnet_objects:
-                                notification_class = bacnet_objects[notification_class_id]
+                            if not notification_class_id == 0 and \
+                                    bacnet_network.exist(ObjectType.NOTIFICATION_CLASS, notification_class_id):
+                                notification_class = bacnet_network.find(ObjectType.NOTIFICATION_CLASS,
+                                                                         notification_class_id)
+                                # notification_class = bacnet_objects[notification_class_id]
+                                assert (type(notification_class) == NotificationClass)
                                 bacnet_object.set_notification_object(notification_class)
-                            bacnet_objects[o[ObjectProperty.OBJECT_IDENTIFIER.id()]] = bacnet_object
+                            # bacnet_objects[o[ObjectProperty.OBJECT_IDENTIFIER.id()]] = bacnet_object
+                            bacnet_network.append(o)
                         data_collector_objects += objects
 
-                collector = VisiobasThreadDataCollector(thread_idx, verifier, bacnet_objects)
+                collector = VisiobasThreadDataCollector(thread_idx, verifier, bacnet_network)
                 if logger.isEnabledFor(logging.INFO):
                     _device_ids = [x.get_id() for x in _devices]
                     logger.info("Collector# {} collect devices: {}".format(thread_idx, _device_ids))
                 for o in data_collector_objects:
-                    bacnet_object = BACnetObject(o)
-                    collector.add_object(bacnet_object)
+                    collector.add_object(BACnetObject(o))
                 collector.start()
                 collectors.append(collector)
                 thread_idx += 1
+
+            if logger.isEnabledFor(logging.DEBUG):
+                with open("bacnet_network.txt", "+w") as file:
+                    for k in bacnet_network.objects:
+                        bacnet_object = bacnet_network.objects[k]
+                        file.write(str(bacnet_object) + '\n')
 
             # wait until all collector stop threads
             for collector in collectors:
