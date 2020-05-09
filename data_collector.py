@@ -543,6 +543,8 @@ if __name__ == '__main__':
     try:
         address_cache = Path(address_cache_path).read_text()
         address_cache_devices = BACnetParser.parse_bacwi(address_cache)
+        if args.device is not None:
+            address_cache_devices = list(filter(lambda x: x["id"] == args.device, address_cache_devices))
         device_ids = [x['id'] for x in address_cache_devices]
 
         # dict of all collecting bacnet objects
@@ -567,6 +569,9 @@ if __name__ == '__main__':
             server_devices = client.rq_devices()
             server_devices = list(
                 filter(lambda x: x[ObjectProperty.OBJECT_IDENTIFIER.id()] in device_ids, server_devices))
+            if args.device is not None:
+                server_devices = list(
+                    filter(lambda x: x[ObjectProperty.OBJECT_IDENTIFIER.id()] == args.device, server_devices))
             for o in server_devices:
                 bacnet_objects[o[ObjectProperty.OBJECT_IDENTIFIER.id()]] = Device(o)
                 if logger.isEnabledFor(logging.DEBUG):
@@ -587,10 +592,6 @@ if __name__ == '__main__':
             # devices with different port value can be collected independently
             for address_cache_device in address_cache_devices:
                 _device_id = address_cache_device['id']
-                if args.device is not None:
-                    if not args.device == _device_id:
-                        continue
-
                 host = address_cache_device['host']
                 port = address_cache_device['port']
                 server_device = None

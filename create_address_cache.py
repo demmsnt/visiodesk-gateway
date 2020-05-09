@@ -39,7 +39,7 @@ if __name__ == "__main__":
     client.rq_login(server['auth']['user'], server['auth']['pwd'])
     try:
         server_devices = client.rq_devices()
-        server_devices = filter(lambda o: o[ObjectProperty.OBJECT_IDENTIFIER.id()] in devices, server_devices)
+        server_devices = list(filter(lambda o: o[ObjectProperty.OBJECT_IDENTIFIER.id()] in devices, server_devices))
         bacwi_devices = []
         for o in server_devices:
             device = Device(o)
