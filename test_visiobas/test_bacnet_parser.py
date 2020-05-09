@@ -6,12 +6,24 @@ from bacnet.parser import BACnetParser
 from bacnet.writer import BACnetWriter
 from bacnet.bacnet import bacnet_name_map
 from bacnet.bacnet import ObjectProperty
+from bacnet.bacnet import ObjectType
+from bacnet.slicer import BACnetSlicer
+import bacnet.config
 
 
 class BACnetParserTest(unittest.TestCase):
     def setUp(self):
         visiobas.visiobas_logging.initialize_logging()
         self.logger = logging.getLogger(__name__)
+
+    def test_bacrp_slicer(self):
+        slicer = BACnetSlicer(bacnet.config.visiobas_slicer)
+        data = slicer.execute_barp(200, ObjectType.ANALOG_INPUT.id(), 23003, [
+            ObjectProperty.PRESENT_VALUE.id(),
+            ObjectProperty.STATUS_FLAGS.id()
+        ])
+        self.assertIn(ObjectProperty.PRESENT_VALUE.id(), data)
+        self.assertIn(ObjectProperty.STATUS_FLAGS.id(), data)
 
     def test_bacrp_parser(self):
         parser = BACnetParser()

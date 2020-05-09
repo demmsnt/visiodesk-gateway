@@ -12,7 +12,7 @@ import bacnet.config
 from bacnet.bacnet import ObjectProperty, StatusFlag, Transition
 from bacnet.bacnet import ObjectType
 from bacnet.parser import BACnetParser
-from bacnet.slicer import BACrpmSlicer
+from bacnet.slicer import BACnetSlicer
 from visiobas.gate_client import VisiobasGateClient
 from visiobas.object.device import Device
 from visiobas.object.notification_class import NotificationClass
@@ -438,7 +438,7 @@ class VisiobasThreadDataCollector(Thread):
                     self.logger.info(
                         "Statistic parsed and push for verification: {}, rate: {:d} object / sec".format(count, rate))
 
-            slicer = BACrpmSlicer(bacnet.config.visiobas_slider)
+            slicer = BACnetSlicer(bacnet.config.visiobas_slicer)
             now = time.time()
             for _object in self.objects:
                 try:

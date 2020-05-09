@@ -4,7 +4,7 @@ from subprocess import Popen, PIPE
 from bacnet.parser import BACnetParser
 
 
-class BACrpmSlicer:
+class BACnetSlicer:
     def __init__(self, config: dict):
         """
         :param bacrpm_app_path:
@@ -16,7 +16,7 @@ class BACrpmSlicer:
 
     def execute(self, read_app: str, **kwargs):
         if read_app == "bacrp":
-            self.execute_barp(device_id=kwargs.get("device_id"),
+            return self.execute_barp(device_id=kwargs.get("device_id"),
                               object_type_code=kwargs.get("object_type_code"),
                               object_id=kwargs.get("object_id"),
                               fields=kwargs.get("fields"))
