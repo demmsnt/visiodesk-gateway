@@ -1,6 +1,7 @@
 import logging
 import time
 import traceback
+import os
 from pathlib import Path
 from threading import Thread
 from random import randint
@@ -729,7 +730,9 @@ if __name__ == '__main__':
                 thread_idx += 1
 
             if logger.isEnabledFor(logging.DEBUG):
-                with open("bacnet_network.txt", "+w") as file:
+                if not os.path.exists("logs"):
+                    os.mkdir("logs")
+                with open("logs/bacnet_network.txt", "+w") as file:
                     for k in bacnet_network.objects:
                         bacnet_object = bacnet_network.objects[k]
                         file.write(str(bacnet_object) + '\n')
