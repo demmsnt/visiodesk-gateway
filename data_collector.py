@@ -732,10 +732,7 @@ if __name__ == '__main__':
             if logger.isEnabledFor(logging.DEBUG):
                 if not os.path.exists("logs"):
                     os.mkdir("logs")
-                with open("logs/bacnet_network.txt", "+w") as file:
-                    for k in bacnet_network.objects:
-                        bacnet_object = bacnet_network.objects[k]
-                        file.write(str(bacnet_object) + '\n')
+                bacnet_network.save("logs/bacnet_network.txt")
 
             # wait until all collector stop threads
             for collector in collectors:

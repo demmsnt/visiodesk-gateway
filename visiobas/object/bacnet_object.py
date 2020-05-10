@@ -13,7 +13,7 @@ class BACnetObject:
         self.status = None
 
     def __str__(self) -> str:
-        return self.get(ObjectProperty.OBJECT_TYPE) + " " + self.get(ObjectProperty.OBJECT_PROPERTY_REFERENCE)
+        return "({}, {}) {}".format(self.get_object_type_name(), self.get_id(), self.get_object_reference())
 
     def get(self, object_property: ObjectProperty, default=None):
         try:

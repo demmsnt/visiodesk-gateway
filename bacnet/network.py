@@ -36,3 +36,10 @@ class BACnetNetwork:
         if type(object_type) == ObjectType:
             object_type = object_type.code()
         return str(object_type) + str(object_id)
+
+    def save(self, file):
+        with open(file, "+w") as file:
+            for k in self.objects:
+                bacnet_object = self.objects[k]
+                file.write(str(bacnet_object) + '\n')
+
