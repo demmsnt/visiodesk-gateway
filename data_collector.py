@@ -504,7 +504,8 @@ class VisiobasThreadDataCollector(Thread):
                                               object_type=object_type_code,
                                               object_id=object_id,
                                               fields=fields)
-                        #
+                        if len(data) == 0:
+                            continue
 
                         _object["time_last_success_pooling"] = time.time()
                         # prepare collected data and store to be transmitted to server
