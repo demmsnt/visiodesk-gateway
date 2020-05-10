@@ -77,8 +77,8 @@ class VisiobasTransmitter(Thread):
                 if time.time() - self.statistic_period_start > self.statistic_log_period:
                     self.statistic_period_start = time.time()
                     count = self.statistic_send_object_count
-                    rate = int(count / (time.time() - self.statistic_send_start))
-                    self.logger.info("Statistic send object: {}, rate: {:d} object / sec".format(count, rate))
+                    rate = float(float(count) / (time.time() - self.statistic_send_start))
+                    self.logger.info("Statistic send object: {}, rate: {:f} object / sec".format(count, rate))
             if len(self.collected_data) == 0:
                 continue
             if len(self.device_ids) == 0:
@@ -373,9 +373,9 @@ class VisiobasDataVerifier(Thread):
                 if time.time() - self.statistic_period_start > self.statistic_log_period:
                     self.statistic_period_start = time.time()
                     count = self.statistic_verified_object_count
-                    rate = int(count / (time.time() - self.statistic_start))
+                    rate = float(float(count) / (time.time() - self.statistic_start))
                     self.logger.info(
-                        "Statistic verify and push for transmit: {}, rate: {:d} object / sec".format(count, rate))
+                        "Statistic verify and push for transmit: {}, rate: {:f} object / sec".format(count, rate))
 
             ids = list(self.collected_data.keys())
             for id in ids:
