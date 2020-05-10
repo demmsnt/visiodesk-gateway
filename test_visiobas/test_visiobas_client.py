@@ -3,11 +3,10 @@ from visiobas.client import VisiobasClient
 from visiobas.gate_client import VisiobasGateClient
 from bacnet.bacnet import ObjectType
 from bacnet.bacnet import ObjectProperty
-import visiobas.visiobas_logging
+import config.logging
 from random import randrange
 from test_visiobas import test_config
-from visiobas.object.bacnet_object import BACnetObject
-from visiobas.object.device import Device
+from visiobas.object.bacnet_object import BACnetObject, Device
 from visiobas import visiodesk
 
 USING_SERVER = "local"
@@ -20,7 +19,7 @@ PWD = test_config.SERVER[USING_SERVER]["pwd"]
 
 class TestVisiobasClient(unittest.TestCase):
     def setUp(self):
-        visiobas.visiobas_logging.initialize_logging()
+        config.logging.initialize_logging()
         self.client = VisiobasClient(HOST, PORT, verify=False)
         self.client.rq_login(USER, PWD)
 
@@ -38,7 +37,7 @@ class TestVisiobasClient(unittest.TestCase):
 
 class TestVisiobasGateClient(unittest.TestCase):
     def setUp(self):
-        visiobas.visiobas_logging.initialize_logging()
+        config.logging.initialize_logging()
         self.client = VisiobasGateClient(HOST, PORT, verify=False)
         self.client.rq_login(USER, PWD)
 
@@ -226,6 +225,7 @@ class TestVisiobasGateClient(unittest.TestCase):
         self.assertTrue(type(topics) is list)
         for topic in topics:
             print(topic)
+
 
 # ERROR 2020-04-19 20:44:09,596 __main__ run      Failed put data: {'79': 'analog-input', '75': 25307.0, '85': '52.13', '846': 200}
 

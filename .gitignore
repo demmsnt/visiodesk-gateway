@@ -3,3 +3,4 @@ __pycache__
 venv
 visiobas.log
 bacnet_network.txt
+logs

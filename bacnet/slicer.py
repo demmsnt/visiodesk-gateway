@@ -37,10 +37,11 @@ class BACnetSlicer:
                                        object_id=kwargs.get("object_id"),
                                        fields=kwargs.get("fields"))
             if len(data) == 0 and self.execute_bacrp_on_fail_bacrpm:
-                return self.execute_barp(device_id=kwargs.get("device_id"),
+                data = self.execute_barp(device_id=kwargs.get("device_id"),
                                          object_type=kwargs.get("object_type"),
                                          object_id=kwargs.get("object_id"),
                                          fields=kwargs.get("fields"))
+            return data
         else:
             raise Exception("Unsupported read app: {}".format(read_app))
 

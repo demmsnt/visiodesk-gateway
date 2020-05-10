@@ -16,9 +16,9 @@ from visiobas.gate_client import VisiobasGateClient
 from visiobas.object.bacnet_object import Device
 from visiobas.object.bacnet_object import NotificationClass
 from visiobas.object.bacnet_object import BACnetObject
-from visiobas.visiobas_logging import initialize_logging
 from visiobas import visiodesk
 from bacnet.network import BACnetNetwork
+import config.logging
 
 bacnet_network = BACnetNetwork()
 
@@ -533,7 +533,7 @@ class VisiobasThreadDataCollector(Thread):
 
 # entry point of data_collector
 if __name__ == '__main__':
-    initialize_logging()
+    config.logging.initialize_logging(logging.DEBUG)
     logger = logging.getLogger('visiobas.data_collector')
     argparser = argparse.ArgumentParser()
     argparser.add_argument("--device", type=int)

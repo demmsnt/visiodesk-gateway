@@ -1,19 +1,20 @@
+import logging
 import os
 import unittest
-import visiobas.visiobas_logging
-import logging
-from bacnet.parser import BACnetParser
-from bacnet.writer import BACnetWriter
-from bacnet.bacnet import bacnet_name_map
+
+import config.logging
+
+import bacnet.config
 from bacnet.bacnet import ObjectProperty
 from bacnet.bacnet import ObjectType
+from bacnet.parser import BACnetParser
 from bacnet.slicer import BACnetSlicer
-import bacnet.config
+from bacnet.writer import BACnetWriter
 
 
 class BACnetParserTest(unittest.TestCase):
     def setUp(self):
-        visiobas.visiobas_logging.initialize_logging()
+        config.logging.initialize_logging()
         self.logger = logging.getLogger(__name__)
 
     def test_bacrp_slicer(self):

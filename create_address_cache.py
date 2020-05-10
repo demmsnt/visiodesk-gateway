@@ -2,12 +2,12 @@ import argparse
 import logging
 import traceback
 
-from visiobas.visiobas_logging import initialize_logging
+import config.logging
 from visiobas.gate_client import VisiobasGateClient
 import bacnet.config
 from bacnet.bacnet import ObjectProperty
 from bacnet.writer import BACnetWriter
-from visiobas.object.device import Device
+from visiobas.object.bacnet_object import Device
 
 
 def print_help():
@@ -18,7 +18,7 @@ def print_help():
 
 
 if __name__ == "__main__":
-    initialize_logging()
+    config.logging.initialize_logging()
     logger = logging.getLogger(__name__)
     parser = argparse.ArgumentParser(description="create address_cache file with table of BACnet devices using data from remote server")
     parser.add_argument('--devices', type=str, default="", help="list of devices id separated by comma")
