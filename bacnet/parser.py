@@ -564,7 +564,7 @@ class BACnetParser:
         self.logger = logging.getLogger('bacnet.parser')
 
     def parse_bacrp(self, text, property_id, object: dict = None):
-        if "BACnet Error: property: unknown-property" in text:
+        if "BACnet Error:" in text:
             return None
         if type(property_id) == ObjectProperty:
             property_id = property_id.id()
