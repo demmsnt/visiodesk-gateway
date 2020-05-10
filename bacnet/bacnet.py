@@ -758,9 +758,6 @@ class ObjectType(enum.Enum):
     TRUNK = "trunk", -1
     GRAPHIC = "graphic", -1
 
-    def id(self):
-        return self.value[0]
-
     def name(self):
         return self.value[0]
 

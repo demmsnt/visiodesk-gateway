@@ -49,7 +49,7 @@ class VisiobasGateClient(VisiobasClient):
         :param object_type: one of supported object type
         :return:
         """
-        url = "{}/vbas/gate/get/{}/{}".format(self.get_addr(), device_id, object_type.id())
+        url = "{}/vbas/gate/get/{}/{}".format(self.get_addr(), device_id, object_type.name())
         return self.get(url)
 
     def rq_put(self, device_id, data):

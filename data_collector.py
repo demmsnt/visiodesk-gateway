@@ -136,8 +136,7 @@ class VisiobasNotifier(Thread):
 
     def get_notification_recipients(self, notification_class_id):
         try:
-            notification_class = self.bacnet_network.find(ObjectType.NOTIFICATION_CLASS,
-                                                          notification_class_id)
+            notification_class = self.bacnet_network.find_by_type(ObjectType.NOTIFICATION_CLASS, notification_class_id)
             return notification_class.get_recipient_list()
         except:
             self.logger.error("Failed get notification group")
@@ -281,8 +280,8 @@ class VisiobasNotifier(Thread):
             for id in ids:
                 try:
                     data = self.collected_data.pop(id)
-                    object_type = data[ObjectProperty.ObjectProperty.OBJECT_TYPE.id()]
-                    bacnet_object = bacnet_network.find(object_type, id)
+                    reference = data[ObjectProperty.OBJECT_PROPERTY_REFERENCE.id()]
+                    bacnet_object = bacnet_network.find(reference)
                     if bacnet_object is None:
                         continue
                         # if id not in self.bacnet_objects:
@@ -304,13 +303,13 @@ class VisiobasDataVerifier(Thread):
                  client: VisiobasGateClient,
                  transmitter: VisiobasTransmitter,
                  notifier: VisiobasNotifier,
-                 bacnet_objects: dict):
+                 bacnet_network: BACnetNetwork):
         super().__init__()
         self.logger = logging.getLogger('visiobas.data_collector.verifier')
         self.transmitter = transmitter
         self.notifier = notifier
         self.collected_data = {}
-        self.bacnet_objects = bacnet_objects
+        self.bacnet_network = bacnet_network
         self.client = client
         self.enabled = True
         # statistic logging
@@ -380,33 +379,39 @@ class VisiobasDataVerifier(Thread):
 
             ids = list(self.collected_data.keys())
             for id in ids:
-                data = self.collected_data.pop(id)
+                try:
 
-                # process status flags
-                # {IN_ALARM, FAULT, OVERRIDDEN, OUT_OF_SERVICE}
-                # IN_ALARM logical FALSE (0) if the Event_State property has a value of NORMAL, otherwise TRUE (1)
-                # FAULT logical TRUE (1) if the reliability property is present and does not have a value of NO_FAULT_DETECTED otherwise FALSE (0)
-                # OVERRIDEN logical TRUE (1) if the point has been overriden by some mechanism local to the BACnet DEvice, otherwise FALSE (0)
-                # OUT_OF_SERVICE logical TRUE (1) if Out_Of_Service property has a value of TRUE otherwise FALSE (0)
+                    data = self.collected_data.pop(id)
 
-                if id in self.bacnet_objects:
-                    bacnet_object = self.bacnet_objects[id]
-                    if bacnet_object.get_event_detection_enable():
-                        # status_flags = StatusFlag(bacnet_object.get_status_flags())
-                        if self.verify_object_out_of_limit(bacnet_object, data):
-                            # setup alarm flag
-                            status_flag = StatusFlag(data[ObjectProperty.STATUS_FLAGS.id()]
-                                                     if ObjectProperty.STATUS_FLAGS.id() in data else None)
-                            status_flag.set_in_alarm(True)
-                            data[ObjectProperty.STATUS_FLAGS.id()] = status_flag.as_list()
-                            # mark object for notification
-                            self.notifier.push_collected_data(data, Transition.TO_OFFNORMAL)
-                            # status_flags = StatusFlag(data[ObjectProperty.STATUS_FLAGS.id()])
-                            # TODO need to verify does need to establish in_alarm flag or not?
-                            # status_flags.set_in_alarm(True)
-                            # data[ObjectProperty.STATUS_FLAGS.id()] = status_flags.as_list()
-                self.transmitter.push_collected_data(data)
-                self.statistic_verified_object_count += 1
+                    # process status flags
+                    # {IN_ALARM, FAULT, OVERRIDDEN, OUT_OF_SERVICE}
+                    # IN_ALARM logical FALSE (0) if the Event_State property has a value of NORMAL, otherwise TRUE (1)
+                    # FAULT logical TRUE (1) if the reliability property is present and does not have a value of NO_FAULT_DETECTED otherwise FALSE (0)
+                    # OVERRIDEN logical TRUE (1) if the point has been overriden by some mechanism local to the BACnet DEvice, otherwise FALSE (0)
+                    # OUT_OF_SERVICE logical TRUE (1) if Out_Of_Service property has a value of TRUE otherwise FALSE (0)
+
+                    reference = data[ObjectProperty.OBJECT_PROPERTY_REFERENCE.id()]
+                    bacnet_object = self.bacnet_network.find(reference)
+                    if bacnet_object:
+                        # bacnet_object = self.bacnet_network[id]
+                        if bacnet_object.get_event_detection_enable():
+                            # status_flags = StatusFlag(bacnet_object.get_status_flags())
+                            if self.verify_object_out_of_limit(bacnet_object, data):
+                                # setup alarm flag
+                                status_flag = StatusFlag(data[ObjectProperty.STATUS_FLAGS.id()]
+                                                         if ObjectProperty.STATUS_FLAGS.id() in data else None)
+                                status_flag.set_in_alarm(True)
+                                data[ObjectProperty.STATUS_FLAGS.id()] = status_flag.as_list()
+                                # mark object for notification
+                                self.notifier.push_collected_data(data, Transition.TO_OFFNORMAL)
+                                # status_flags = StatusFlag(data[ObjectProperty.STATUS_FLAGS.id()])
+                                # TODO need to verify does need to establish in_alarm flag or not?
+                                # status_flags.set_in_alarm(True)
+                                # data[ObjectProperty.STATUS_FLAGS.id()] = status_flags.as_list()
+                    self.transmitter.push_collected_data(data)
+                    self.statistic_verified_object_count += 1
+                except:
+                    self.logger.exception()
             time.sleep(0.01)
 
 
@@ -437,12 +442,9 @@ class VisiobasThreadDataCollector(Thread):
         _type_code = bacnet_object.get_object_type_code()
         _update_interval = bacnet_object.get_update_interval()
         _reference = bacnet_object.get_object_reference()
-        device = self.bacnet_network.find(ObjectType.DEVICE, _device_id)
+        device = self.bacnet_network.find_by_type(ObjectType.DEVICE, _device_id)
         _read_app = device.get_read_app() if device is not None else None
-        # if _device_id in self.bacnet_objects:
-        #     device = self.bacnet_objects[_device_id]
-        #     if device is not None:
-        #         _read_app = device.get_read_app()
+
         self.objects.append({
             "device_id": _device_id,
             "object_type_code": _type_code,
@@ -587,12 +589,7 @@ if __name__ == '__main__':
                 device = Device(o)
                 if args.read_app is not None:
                     device.set_read_app(args.read_app)
-                # bacnet_objects[o[ObjectProperty.OBJECT_IDENTIFIER.id()]] = device
                 bacnet_network.append(device)
-                # if logger.isEnabledFor(logging.DEBUG):
-                #     logger.debug("append Device into bacnet_objects container: {}, read_app: '{}'"
-                #                  .format(bacnet_network.find_bacnet_object() bacnet_objects[o[ObjectProperty.OBJECT_IDENTIFIER.id()]],
-                #                          bacnet_objects[o[ObjectProperty.OBJECT_IDENTIFIER.id()]].get_read_app()))
 
             if not len(device_ids) == len(server_devices):
                 logger.warning("Not all bacwi table devices exist on server")
@@ -608,7 +605,7 @@ if __name__ == '__main__':
             # devices with different port value can be collected independently
             for address_cache_device in address_cache_devices:
                 _device_id = address_cache_device['id']
-                server_device = bacnet_network.find(ObjectType.DEVICE, _device_id)
+                server_device = bacnet_network.find_by_type(ObjectType.DEVICE, _device_id)
                 if not server_device:
                     # if _device_id not in bacnet_objects:
                     logger.warning("Device not found: {}".format(address_cache_device))
@@ -708,14 +705,11 @@ if __name__ == '__main__':
                         for o in objects:
                             bacnet_object = BACnetObject(o)
                             notification_class_id = bacnet_object.get_notification_class()
-                            if not notification_class_id == 0 and \
-                                    bacnet_network.exist(ObjectType.NOTIFICATION_CLASS, notification_class_id):
-                                notification_class = bacnet_network.find(ObjectType.NOTIFICATION_CLASS,
-                                                                         notification_class_id)
-                                # notification_class = bacnet_objects[notification_class_id]
+                            notification_class = bacnet_network.find_by_type(ObjectType.NOTIFICATION_CLASS,
+                                                                             notification_class_id)
+                            if notification_class:
                                 assert (type(notification_class) == NotificationClass)
                                 bacnet_object.set_notification_object(notification_class)
-                            # bacnet_objects[o[ObjectProperty.OBJECT_IDENTIFIER.id()]] = bacnet_object
                             bacnet_network.append(o)
                         data_collector_objects += objects
 
