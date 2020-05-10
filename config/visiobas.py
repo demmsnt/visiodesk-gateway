@@ -4,8 +4,8 @@ bacnet_stack_path = Path("bacnet-stack")
 address_cache_path = bacnet_stack_path / "address_cache"
 
 visiobas_slicer = {
-    "bacrp": bacnet_stack_path / "bacrp",
-    "bacrpm": bacnet_stack_path / "bacrpm"
+    "bacrp": (bacnet_stack_path / "bacrp").absolute(),
+    "bacrpm": (bacnet_stack_path / "bacrpm").absolute()
 }
 
 __local = {
