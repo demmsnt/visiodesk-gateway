@@ -4,7 +4,7 @@ import unittest
 
 import config.logging
 
-import bacnet.config
+import config.visiobas
 from bacnet.bacnet import ObjectProperty
 from bacnet.bacnet import ObjectType
 from bacnet.parser import BACnetParser
@@ -18,7 +18,7 @@ class BACnetParserTest(unittest.TestCase):
         self.logger = logging.getLogger(__name__)
 
     def test_bacrp_slicer(self):
-        slicer = BACnetSlicer(bacnet.config.visiobas_slicer)
+        slicer = BACnetSlicer(config.visiobas.visiobas_slicer)
         data = slicer.execute_barp(200, ObjectType.ANALOG_INPUT, 23003, [
             ObjectProperty.PRESENT_VALUE.id(),
             ObjectProperty.STATUS_FLAGS.id(),
@@ -29,7 +29,7 @@ class BACnetParserTest(unittest.TestCase):
         self.assertEqual(data[ObjectProperty.OBJECT_IDENTIFIER.id()], 23003)
 
     def test_bacrpm_slicer(self):
-        slicer = BACnetSlicer(bacnet.config.visiobas_slicer)
+        slicer = BACnetSlicer(config.visiobas.visiobas_slicer)
         data = slicer.execute_bacrpm(200, ObjectType.ANALOG_INPUT, 23003, [
             ObjectProperty.PRESENT_VALUE.id(),
             ObjectProperty.STATUS_FLAGS.id(),

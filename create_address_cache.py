@@ -4,7 +4,7 @@ import traceback
 
 import config.logging
 from visiobas.gate_client import VisiobasGateClient
-import bacnet.config
+import config.visiobas
 from bacnet.bacnet import ObjectProperty
 from bacnet.writer import BACnetWriter
 from visiobas.object.bacnet_object import Device
@@ -31,7 +31,7 @@ if __name__ == "__main__":
     if logger.isEnabledFor(logging.DEBUG):
         logger.debug("create address cache for devices: {}".format(devices))
 
-    server = bacnet.config.visiobas_server
+    server = config.visiobas.visiobas_server
     if logger.isEnabledFor(logging.DEBUG):
         logger.debug("using visiobas server {}:{}".format(server['host'], server['port']))
 

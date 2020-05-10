@@ -6,8 +6,8 @@ from threading import Thread
 from random import randint
 import argparse
 
-import bacnet.config
-import bacnet.config
+import config.visiobas
+import config.visiobas
 from bacnet.bacnet import ObjectProperty, StatusFlag, Transition
 from bacnet.bacnet import ObjectType
 from bacnet.parser import BACnetParser
@@ -468,7 +468,7 @@ class VisiobasThreadDataCollector(Thread):
                     self.logger.info(
                         "Statistic parsed and push for verification: {}, rate: {:f} object / sec".format(count, rate))
 
-            slicer = BACnetSlicer(bacnet.config.visiobas_slicer)
+            slicer = BACnetSlicer(config.visiobas.visiobas_slicer)
             now = time.time()
             for _object in self.objects:
                 try:
@@ -544,7 +544,7 @@ if __name__ == '__main__':
     argparser.add_argument("--read_app", type=str)
     args = argparser.parse_args()
 
-    address_cache_path = bacnet.config.address_cache_path
+    address_cache_path = config.visiobas.address_cache_path
     if not Path(address_cache_path).is_file():
         logger.error("File 'address_cache' not found: {}".format(address_cache_path))
         exit(0)
@@ -561,14 +561,14 @@ if __name__ == '__main__':
         # bacnet_objects = {}
 
         client = VisiobasGateClient(
-            bacnet.config.visiobas_server['host'],
-            bacnet.config.visiobas_server['port'],
-            bacnet.config.visiobas_server['ssl_verify'])
+            config.visiobas.visiobas_server['host'],
+            config.visiobas.visiobas_server['port'],
+            config.visiobas.visiobas_server['ssl_verify'])
 
         try:
             # how often need to perform login ?
-            client.rq_login(bacnet.config.visiobas_server['auth']['user'],
-                            bacnet.config.visiobas_server['auth']['pwd'])
+            client.rq_login(config.visiobas.visiobas_server['auth']['user'],
+                            config.visiobas.visiobas_server['auth']['pwd'])
 
             # get notification class objects
             notification_class = client.rq_device_object(1, ObjectType.NOTIFICATION_CLASS)
