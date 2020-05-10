@@ -618,7 +618,7 @@ class BACnetParser:
         return result
 
     def parse_bacrpm(self, text):
-        if text in "BACnet Reject: Unrecognized Service":
+        if "BACnet Reject: Unrecognized Service" in text:
             return {}
 
         char_reader = CharReader(text)

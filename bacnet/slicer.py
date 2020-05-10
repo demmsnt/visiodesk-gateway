@@ -83,6 +83,7 @@ class BACnetSlicer:
         ]
         output = self.__execute_app(args, cwd)
         try:
+            output = "BACnet Reject: Unrecognized Service"
             return self.parser.parse_bacrpm(output)
         except Exception as e:
             self.logger.error("Failed parse bacrpm: {}".format(e))
