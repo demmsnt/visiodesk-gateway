@@ -1,5 +1,16 @@
+import enum
 import json
 from bacnet.bacnet import ObjectProperty, ObjectType
+from visiobas.visiodesk import TopicPriority
+
+
+class Transition(enum.Enum):
+    TO_OFFNORMAL = 0
+    TO_FAULT = 1
+    TO_NORMAL = 2
+
+    def id(self):
+        return self.value
 
 
 class BACnetObject:
@@ -9,17 +20,20 @@ class BACnetObject:
         self._default_update_interval = 3600
         self.property_list = None
         self.notification_object = None
-        # TODO not sure about store in memory only some status for indicate OFFNORMAL, NORMAL, OUT_OF_SERVICE
-        self.status = None
 
     def __str__(self) -> str:
         return "({}, {}) {}".format(self.get_object_type_name(), self.get_id(), self.get_object_reference())
 
-    def get(self, object_property: ObjectProperty, default=None):
+    def get(self, object_property, default=None):
+        property_code = object_property.id() if type(object_property) == ObjectProperty else object_property
         try:
-            return self._data[object_property.id()]
+            return self._data[property_code]
         except:
             return default
+
+    def set(self, object_property, value):
+        property_code = object_property.id() if type(object_property) == ObjectProperty else object_property
+        self._data[property_code] = value
 
     def get_property_list(self):
         if self.property_list is not None:
@@ -115,8 +129,35 @@ class BACnetObject:
     def get_status_flags(self):
         return self.get(ObjectProperty.STATUS_FLAGS, [False, False, False, False])
 
+    def set_status_flags(self, flags: list):
+        self.set(ObjectProperty.STATUS_FLAGS, flags)
+
     def get_reliability(self):
-        return self.get(ObjectProperty.RELIABILITY, "")
+        return self.get(ObjectProperty.RELIABILITY, "no-fault-detected")
+
+    def set_reliability(self, reliability):
+        self.set(ObjectProperty.RELIABILITY, reliability)
+
+    def get_event_message_texts(self):
+        return self.get(ObjectProperty.EVENT_MESSAGE_TEXTS, ["", "", ""])
+
+    def get_event_message_text(self, transition: Transition):
+        try:
+            return self.get_event_message_texts()[transition.id()]
+        except:
+            return ""
+
+    def is_notification_allowed(self, transition: Transition):
+        try:
+            return self.get(ObjectProperty.EVENT_ENABLE, [False, False, False])[transition.id()]
+        except:
+            return False
+
+    def get_present_value(self):
+        return self.get(ObjectProperty.PRESENT_VALUE.id())
+
+    def set_present_value(self, value):
+        self.set(ObjectProperty.PRESENT_VALUE.id(), value)
 
 
 class Device(BACnetObject):
@@ -192,3 +233,11 @@ class NotificationClass(BACnetObject):
     def get_recipient_list(self):
         recipient_list = self.get(ObjectProperty.RECIPIENT_LIST)
         return recipient_list if type(recipient_list) is list else []
+
+    def get_priority(self, transition):
+        default = [TopicPriority.TOP, TopicPriority.NORM, TopicPriority.NORM]
+        try:
+            # TODO make priority enum
+            return self.get(ObjectProperty.PRIORITY, default)[transition.id()]
+        except:
+            return default[transition.id()]

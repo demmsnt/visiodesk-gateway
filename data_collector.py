@@ -9,14 +9,12 @@ import argparse
 
 import config.visiobas
 import config.visiobas
-from bacnet.bacnet import ObjectProperty, StatusFlag, Transition
+from bacnet.bacnet import ObjectProperty, StatusFlag
 from bacnet.bacnet import ObjectType
 from bacnet.parser import BACnetParser
 from bacnet.slicer import BACnetSlicer
 from visiobas.gate_client import VisiobasGateClient
-from visiobas.object.bacnet_object import Device
-from visiobas.object.bacnet_object import NotificationClass
-from visiobas.object.bacnet_object import BACnetObject
+from visiobas.object.bacnet_object import BACnetObject, Device, NotificationClass, Transition
 from visiobas import visiodesk
 from bacnet.network import BACnetNetwork
 import config.logging
@@ -57,19 +55,19 @@ class VisiobasTransmitter(Thread):
     def set_enable(self, enabled):
         self.enabled = enabled
 
-    def push_collected_data(self, data: dict):
+    def push_collected_data(self, bacnet_object: BACnetObject):
         if not self.enabled:
             return
-
         try:
-            _id = data[ObjectProperty.OBJECT_IDENTIFIER.id()]
-            _device_id = data[ObjectProperty.DEVICE_ID.id()]
-            self.collected_data[_id] = data
-            if _device_id not in self.device_ids:
-                self.device_ids.append(_device_id)
+            # _id = data[ObjectProperty.OBJECT_IDENTIFIER.id()]
+            # _device_id = data[ObjectProperty.DEVICE_ID.id()]
+            key = bacnet_object.get_object_reference()
+            device_id = bacnet_object.get_device_id()
+            self.collected_data[key] = bacnet_object
+            if device_id not in self.device_ids:
+                self.device_ids.append(device_id)
         except:
-            self.logger.error("Failed put collected data: {}".format(data))
-            self.logger.error(traceback.format_exc())
+            self.logger.exception("Failed put collected data: {}".format(bacnet_object))
 
     def run(self) -> None:
         while True:
@@ -79,41 +77,39 @@ class VisiobasTransmitter(Thread):
                     count = self.statistic_send_object_count
                     rate = float(float(count) / (time.time() - self.statistic_send_start))
                     self.logger.info("Statistic send object: {}, rate: {:f} object / sec".format(count, rate))
+
             if len(self.collected_data) == 0:
                 continue
             if len(self.device_ids) == 0:
                 continue
+
             if self.logger.isEnabledFor(logging.DEBUG):
                 logger.debug("Prepare collected data size: {} of devices: {} for sending".format(
                     len(self.collected_data), self.device_ids))
-            _device_ids = self.device_ids.copy()
-            # iterate over all object devices to be able to send all different device objects
-            while _device_ids:
-                _device_id = _device_ids.pop()
-                object_ids_group_by_device = list(
-                    filter(lambda _id: self.collected_data[_id][ObjectProperty.DEVICE_ID.id()] == _device_id,
-                           self.collected_data))
-                # remove from collected data grouped devices
-                _objects = []
-                for _id in object_ids_group_by_device:
-                    try:
-                        object = self.collected_data.pop(_id)
-                        # send only necessary fields
-                        _data = {}
-                        for field in self.send_fields:
-                            if field in object:
-                                _data[field] = object[field]
-                        _objects.append(_data)
-                    except:
-                        self.logger.error(traceback.format_exc())
-                request = _objects
-                try:
-                    self.gate_client.rq_put(_device_id, request)
-                except Exception as e:
-                    self.logger.error("Failed put data: {}".format(e))
-                    self.logger.error("Failed put data: {}".format(request))
-                self.statistic_send_object_count += len(_objects)
 
+            device_ids = self.device_ids.copy()
+            # iterate over all object devices to be able to send all different device objects
+            while device_ids:
+                device_id = device_ids.pop()
+                keys_group_by_device = list(
+                    filter(lambda key: self.collected_data[key].get_device_id() == device_id, self.collected_data))
+                # remove from collected data grouped devices
+                request = []
+                for key in keys_group_by_device:
+                    try:
+                        bacnet_object = self.collected_data.pop(key)
+                        # send only necessary fields
+                        data = {}
+                        for field in self.send_fields:
+                            data[field] = bacnet_object.get(field)
+                        request.append(data)
+                    except:
+                        self.logger.exception("Failed prepare request data of: {}".format(key))
+                try:
+                    self.gate_client.rq_put(device_id, request)
+                except Exception as e:
+                    self.logger.exception("Failed put data: {}".format(request))
+                self.statistic_send_object_count += len(request)
             time.sleep(self.period)
 
 
@@ -124,10 +120,13 @@ class VisiobasNotifier(Thread):
         super().__init__()
         self.client = client
         self.bacnet_network = bacnet_network
-        self.collected_data = {}
+        self.transitions = {}
         self.logger = logging.getLogger('visiobas.data_collector.notifier')
         self.notification_groups = {}
         self.enabled = True
+        self.topic_id_cache = {}
+        self.group_id_cache = {}
+        self.description_cache = {}
         # self.notification_group_name = notification_group_name
         # self.notification_group_id = self.__find_notification_group_id()
 
@@ -142,55 +141,96 @@ class VisiobasNotifier(Thread):
             self.logger.error("Failed get notification group")
         return None
 
-    def push_collected_data(self, data, transition: Transition):
+    def push_transitions(self, bacnet_object: BACnetObject, transition: Transition):
         if not self.enabled:
             return
-
         try:
-            id = data[ObjectProperty.OBJECT_IDENTIFIER.id()]
-            self.collected_data[id] = data
+            key = bacnet_object.get_object_reference() + "_" + str(transition)
+            self.transitions[key] = (bacnet_object, transition)
         except:
-            self.logger.error("Failed put collected data: {}".format(data))
-            self.logger.error(traceback.format_exc())
+            self.logger.exception("Failed put collected data: {}".format(bacnet_object))
 
     @staticmethod
     def __is_reference(reference: str):
         return reference.startswith("Site:")
 
-    def __find_topic(self, reference):
+    @staticmethod
+    def __is_system_topic_item_text(text: str):
+        return text.startswith("~System Notification~")
+
+    @staticmethod
+    def __create_system_topic_item_text(group_name, bacnet_object):
+        return "\n".join([
+            "~System Notification~",
+            "Group: {}".format(group_name),
+            "Reference: {}".format(bacnet_object.get_object_reference())
+        ])
+
+    @staticmethod
+    def __decode_system_topic_item_text(text):
+        group_name = -1
+        reference = ""
+        for line in text.split("\n"):
+            if line.startswith("Group:"):
+                group_name = line[len("Group:"):].strip()
+            elif line.startswith("Reference:"):
+                reference = line[len("Reference:"):].strip()
+        return {
+            "group_name": group_name,
+            "reference": reference
+        }
+
+    def __find_topic_id(self, group_name, reference):
         try:
+            key = group_name + "_" + reference
+            if key in self.topic_id_cache:
+                # TODO does topic still exist on server?
+                return self.topic_id_cache[key]
+
             topics = self.client.rq_vdesk_get_topic_by_user()
+            # TODO update API filter by group ? - need to find topic for write notification about FAILED sensor point
             for topic in topics:
-                items = topic['items']
+                items = topic["items"]
                 for item in items:
-                    if item['type']['id'] == visiodesk.ItemType.MESSAGE.id():
-                        if self.__is_reference(item['text']):
-                            item_reference = item['text']
-                            if item_reference == reference:
-                                return topic
+                    if item["type"]["id"] == visiodesk.ItemType.MESSAGE.id():
+                        if self.__is_system_topic_item_text(item["text"]):
+                            decoded = self.__decode_system_topic_item_text(item["text"])
+                            if decoded["group_name"] == group_name and decoded["reference"] == reference:
+                                self.topic_id_cache[key] = topic["id"]
+                                return topic["id"]
             return None
         except:
-            self.logger.error(traceback.format_exc())
+            self.logger.exception("Failed find topic group: {} reference: {}", group_name, reference)
             return None
 
     def __find_notification_group_id(self, group_name) -> int:
         try:
+            if group_name in self.group_id_cache:
+                return self.group_id_cache[group_name]
             groups = self.client.rq_vdesk_get_groups()
             found = next(filter(lambda g: g["name"] == group_name, groups), None)
-            return found['id'] if found is not None else 0
+            group_id = found['id'] if found is not None else 0
+            if not group_id == 0:
+                self.group_id_cache[group_name] = group_id
+            return group_id
         except:
-            self.logger.error(traceback.format_exc())
+            self.logger.exception("Failed find group: {}".format(group_name))
             return 0
 
-    def __create_topic(self, group_id: int, bacnet_object: BACnetObject):
+    def __create_topic(self, group_name: str, bacnet_object: BACnetObject, transition: Transition):
+        group_id = self.__find_notification_group_id(group_name)
+
         description = bacnet_object.get_description()
         reference = bacnet_object.get_object_reference()
 
         # родительская папка (description родительской папки)
-        topic_title = description if description else reference
+        topic_title = self.__find_topic_title(bacnet_object)
+        topic_title = topic_title if topic_title else reference
 
         # аварийный текст "Значение вышло за пределы к"
-        topic_description = "[p]{} OUT OF LIMITS[/p]".format(topic_title)
+        topic_description = description
+        topic_description = topic_description if topic_description else "[p]{} OUT OF LIMITS[/p]".format(topic_title)
+        priority_id = bacnet_object.get_notification_object().get_priority(transition)
 
         data = {
             "name": topic_title,
@@ -201,9 +241,9 @@ class VisiobasNotifier(Thread):
                         "id": visiodesk.ItemType.PRIORITY.id()
                     },
                     "priority": {
-                        "id": visiodesk.TopicPriority.HEED.id()
+                        "id": priority_id
                     },
-                    "text": visiodesk.TopicPriority.HEED.name(),
+                    "text": visiodesk.TopicPriority.from_id(priority_id).name(),
                     "name": "Повышенный",
                     "like": 0
                 },
@@ -222,7 +262,15 @@ class VisiobasNotifier(Thread):
                     "type": {
                         "id": visiodesk.ItemType.MESSAGE.id()
                     },
-                    "text": reference,
+                    "text": self.__create_system_topic_item_text(group_name, bacnet_object),
+                    "name": "Сообщение",
+                    "like": 0
+                },
+                {
+                    "type": {
+                        "id": visiodesk.ItemType.MESSAGE.id()
+                    },
+                    "text": bacnet_object.get_event_message_text(transition),
                     "name": "Сообщение",
                     "like": 0
                 }
@@ -230,10 +278,14 @@ class VisiobasNotifier(Thread):
             "groups": [{"id": group_id}],
             "description": topic_description
         }
-        self.client.rq_vdesk_add_topic(data)
+        topic = self.client.rq_vdesk_add_topic(data)
+        key = group_name + "_" + reference
+        self.topic_id_cache[key] = topic["id"]
+        print(topic)
 
-    def __change_status_if_necessary(self, topic, bacnet_object):
+    def __change_status_if_necessary(self, topic_id, bacnet_object):
         try:
+            topic = self.client.rq_vdesk_get_topic_by_id(topic_id)
             items = topic["items"]
             last_status_id = None
             for item in items:
@@ -255,11 +307,30 @@ class VisiobasNotifier(Thread):
                     }
                 }])
         except:
-            self.logger.error("Failed change topic status")
-            self.logger.error(traceback.format_exc())
+            self.logger.exception("Failed change topic status, topic id: {} object: {}".format(topic_id, bacnet_object))
 
-    def create_notification_to_offnormal(self, data, bacnet_object, notification_class):
-        topic = self.__find_topic(bacnet_object.get_object_reference())
+    def __create_notification(self, bacnet_object: BACnetObject, transition: Transition):
+        notification_class = bacnet_object.get_notification_object()
+        if not notification_class:
+            return
+        recipients = notification_class.get_recipient_list()
+        for recipient in recipients:
+            group_name = recipient["recipient"] if "recipient" in recipient else None
+            transitions = recipient["transitions"] if "transitions" in recipient else None
+            if not group_name or not transitions:
+                continue
+            topic_id = self.__find_topic_id(group_name, bacnet_object.get_object_reference())
+            if topic_id is None:
+                notification_allowed = bacnet_object.is_notification_allowed(transition) \
+                                       and transitions[transition.id()]
+                if notification_allowed:
+                    self.__create_topic(group_name, bacnet_object, transition)
+            else:
+                self.__append_transition_text_if_necessary(topic_id, bacnet_object)
+                self.__change_status_if_necessary(topic_id, bacnet_object)
+
+    def __create_notification_to_offnormal(self, bacnet_object: BACnetObject, notification_class: NotificationClass):
+        topic = self.__find_topic_id(bacnet_object.get_object_reference())
         if topic is None:
             recipient_list = notification_class.get_recipient_list()
             for recipient in recipient_list:
@@ -276,26 +347,75 @@ class VisiobasNotifier(Thread):
 
     def run(self) -> None:
         while True:
-            ids = list(self.collected_data.keys())
-            for id in ids:
+            keys = list(self.transitions.keys())
+            for key in keys:
                 try:
-                    data = self.collected_data.pop(id)
-                    reference = data[ObjectProperty.OBJECT_PROPERTY_REFERENCE.id()]
-                    bacnet_object = bacnet_network.find(reference)
-                    if bacnet_object is None:
-                        continue
-                        # if id not in self.bacnet_objects:
-                        #    continue
+                    bacnet_object, transition = self.transitions.pop(key)
+                    self.__create_notification(bacnet_object, transition)
+                    # bacnet_object = self.bacnet_network.find()
+                    # data = self.transitions.pop(key)
+                    # reference = data[ObjectProperty.OBJECT_PROPERTY_REFERENCE.id()]
+                    # bacnet_object = bacnet_network.find(reference)
+                    # if bacnet_object is None:
+                    #    continue
+                    # if id not in self.bacnet_objects:
+                    #    continue
                     # bacnet_object = self.bacnet_objects[id]
-                    notification_class = bacnet_object.get_notification_object()
-                    if notification_class is None:
-                        continue
-                    self.create_notification_to_offnormal(data, bacnet_object, notification_class)
+                    # notification_class = bacnet_object.get_notification_object()
+                    # if notification_class is None:
+                    #     continue
+                    #
+                    # if transition == Transition.TO_OFFNORMAL:
+                    #     self.__create_notification_to_offnormal(bacnet_object, notification_class)
+                    # elif transition == Transition.TO_FAULT:
+                    #     self.create_notification_to_fault(bacnet_object, notification_class)
+                    # elif transition == Transition.TO_NORMAL:
+                    #     self.__create_notification_to_offnormal()
                 except:
-                    self.logger.error("Notification failed")
-                    self.logger.error(traceback.format_exc())
+                    self.logger.exception("Failed create notification of: {}".format(key))
 
             time.sleep(1)
+
+    def __find_topic_title(self, bacnet_object):
+        try:
+            reference = bacnet_object.get_object_reference()
+            parent_reference = "/".join(self.client.reference_as_list(reference)[:-1])
+            if parent_reference in self.description_cache:
+                return self.description_cache[parent_reference]
+            parent = self.client.rq_vbas_get_object(parent_reference)
+            self.description_cache[parent_reference] = parent[ObjectProperty.DESCRIPTION.id()]
+            return self.description_cache[parent_reference]
+        except:
+            self.logger.exception("Failed get topic title: {}".format(bacnet_object))
+        return None
+
+    def __append_transition_text_if_necessary(self, topic_id, bacnet_object):
+        # TODO add transition text into topic if necessary
+        pass
+        # try:
+        #     topic = self.client.rq_vdesk_get_topic_by_id(topic_id)
+        #     items = topic["items"]
+        #     last_status_id = None
+        #     for item in items:
+        #         if item["type"]["id"] == visiodesk.ItemType.STATUS.id():
+        #             last_status_id = item["status"]["id"]
+        #     if last_status_id == visiodesk.TopicStatus.RESOLVED.id():
+        #         self.client.rq_vdesk_add_topic_items([{
+        #             "type": {
+        #                 "id": visiodesk.ItemType.STATUS.id()
+        #             },
+        #             "status": {
+        #                 "id": visiodesk.TopicStatus.NEW.id()
+        #             },
+        #             "text": visiodesk.TopicStatus.NEW.name(),
+        #             "name": "Новая",
+        #             "like": 0,
+        #             "topic": {
+        #                 "id": topic["id"]
+        #             }
+        #         }])
+        # except:
+        #     self.logger.exception("Failed change topic status, topic id: {} object: {}".format(topic_id, bacnet_object))
 
 
 class VisiobasDataVerifier(Thread):
@@ -312,6 +432,7 @@ class VisiobasDataVerifier(Thread):
         self.bacnet_network = bacnet_network
         self.client = client
         self.enabled = True
+
         # statistic logging
         self.statistic_verified_object_count = 0
         self.statistic_log_period = 10
@@ -321,16 +442,15 @@ class VisiobasDataVerifier(Thread):
     def set_enable(self, enabled):
         self.enabled = enabled
 
-    def push_collected_data(self, data: dict):
+    def push_collected_data(self, bacnet_object: BACnetObject, data: dict):
         if not self.enabled:
             return
-
         try:
-            id = data[ObjectProperty.OBJECT_IDENTIFIER.id()]
-            self.collected_data[id] = data
+            key = bacnet_object.get_object_reference()
+            # id = data[ObjectProperty.OBJECT_IDENTIFIER.id()]
+            self.collected_data[key] = (bacnet_object, data)
         except:
-            self.logger.error("Failed put collected data: {}".format(data))
-            self.logger.error(traceback.format_exc())
+            self.logger.exception("Failed put collected data: {} object: {}".format(data, bacnet_object))
 
     def verify_analog_object_out_of_limit(self, bacnet_object: BACnetObject, data: dict):
         present_value = data[ObjectProperty.PRESENT_VALUE.id()]
@@ -377,11 +497,10 @@ class VisiobasDataVerifier(Thread):
                     self.logger.info(
                         "Statistic verify and push for transmit: {}, rate: {:f} object / sec".format(count, rate))
 
-            ids = list(self.collected_data.keys())
-            for id in ids:
+            keys = list(self.collected_data.keys())
+            for key in keys:
                 try:
-
-                    data = self.collected_data.pop(id)
+                    bacnet_object, data = self.collected_data.pop(key)
 
                     # process status flags
                     # {IN_ALARM, FAULT, OVERRIDDEN, OUT_OF_SERVICE}
@@ -390,28 +509,86 @@ class VisiobasDataVerifier(Thread):
                     # OVERRIDEN logical TRUE (1) if the point has been overriden by some mechanism local to the BACnet DEvice, otherwise FALSE (0)
                     # OUT_OF_SERVICE logical TRUE (1) if Out_Of_Service property has a value of TRUE otherwise FALSE (0)
 
-                    reference = data[ObjectProperty.OBJECT_PROPERTY_REFERENCE.id()]
-                    bacnet_object = self.bacnet_network.find(reference)
-                    if bacnet_object:
-                        # bacnet_object = self.bacnet_network[id]
-                        if bacnet_object.get_event_detection_enable():
-                            # status_flags = StatusFlag(bacnet_object.get_status_flags())
-                            if self.verify_object_out_of_limit(bacnet_object, data):
-                                # setup alarm flag
-                                status_flag = StatusFlag(data[ObjectProperty.STATUS_FLAGS.id()]
-                                                         if ObjectProperty.STATUS_FLAGS.id() in data else None)
-                                status_flag.set_in_alarm(True)
-                                data[ObjectProperty.STATUS_FLAGS.id()] = status_flag.as_list()
-                                # mark object for notification
-                                self.notifier.push_collected_data(data, Transition.TO_OFFNORMAL)
-                                # status_flags = StatusFlag(data[ObjectProperty.STATUS_FLAGS.id()])
-                                # TODO need to verify does need to establish in_alarm flag or not?
-                                # status_flags.set_in_alarm(True)
-                                # data[ObjectProperty.STATUS_FLAGS.id()] = status_flags.as_list()
-                    self.transmitter.push_collected_data(data)
+                    # reference = data[ObjectProperty.OBJECT_PROPERTY_REFERENCE.id()]
+                    # bacnet_object = self.bacnet_network.find(reference)
+                    # assert (bacnet_object)
+
+                    transitions = []
+
+                    flags0 = StatusFlag(bacnet_object.get_status_flags().copy())
+                    flags1 = StatusFlag(bacnet_object.get_status_flags().copy())
+
+                    data_reliability = data[ObjectProperty.RELIABILITY.id()] \
+                        if ObjectProperty.RELIABILITY.id() in data else "no-fault-detected"
+                    data_flags = StatusFlag(data[ObjectProperty.STATUS_FLAGS.id()]
+                                            if ObjectProperty.STATUS_FLAGS.id() in data else None)
+
+                    # handle TO_FAULT object transition
+                    if "fault" in data:
+                        # data point not available, probably it offline
+                        if not flags0.get_fault():
+                            flags1.set_fault(True)
+                            transitions.append(Transition.TO_FAULT)
+                    else:
+                        # verification FAULT flag after object data collection
+                        if data_flags.get_fault() or not data_reliability == "no-fault-detected":
+                            if not flags0.get_fault():
+                                flags1.set_fault(True)
+                                transitions.append(Transition.TO_FAULT)
+                        elif flags0.get_fault():
+                            # return FAULT flag to normal after object restore data collection for instance
+                            flags1.set_fault(False)
+
+                    # handle TO_ALARM object transition
+                    if bacnet_object.get_event_detection_enable():
+                        is_out_of_limit = self.verify_object_out_of_limit(bacnet_object, data)
+                        if is_out_of_limit and not flags0.get_in_alarm():
+                            flags1.set_in_alarm(True)
+                            transitions.append(Transition.TO_OFFNORMAL)
+                            # self.notifier.push_collected_data(data, Transition.TO_OFFNORMAL)
+                            # status_flags = StatusFlag(data[ObjectProperty.STATUS_FLAGS.id()])
+                            # TODO need to verify does need to establish in_alarm flag or not?
+                            # status_flags.set_in_alarm(True)
+                            # data[ObjectProperty.STATUS_FLAGS.id()] = status_flags.as_list()
+                        elif not is_out_of_limit:
+                            flags1.set_in_alarm(False)
+                    elif flags0.get_in_alarm():
+                        # restore IN_ALARM flag if event detection disable
+                        flags1.set_in_alarm(False)
+
+                    # handle TO_NORMAL object transition
+                    if flags0.is_abnormal() and flags1.is_normal():
+                        transitions.append(Transition.TO_NORMAL)
+
+                    # update state of bacnet_object depend on collected data
+                    if not "fault" in data:
+                        for property_code in data:
+                            if property_code == ObjectProperty.STATUS_FLAGS.id():
+                                bacnet_object.set_status_flags(flags1.as_list())
+
+                            elif property_code == ObjectProperty.RELIABILITY.id():
+                                bacnet_object.set_reliability(data_reliability)
+
+                            elif property_code == ObjectProperty.PRESENT_VALUE.id():
+                                object_type_code = bacnet_object.get_object_type_code()
+                                if object_type_code == ObjectType.ANALOG_INPUT.code() or \
+                                        object_type_code == ObjectType.ANALOG_OUTPUT.code() or \
+                                        object_type_code == ObjectType.ANALOG_VALUE.code():
+                                    bacnet_object.set_present_value(float(data[property_code]))
+                                elif object_type_code == ObjectType.MULTI_STATE_INPUT.code() or \
+                                        object_type_code == ObjectType.MULTI_STATE_OUTPUT.code() or \
+                                        object_type_code == ObjectType.MULTI_STATE_VALUE.code():
+                                    bacnet_object.set_present_value(int(float(data[property_code])))
+                            else:
+                                bacnet_object.set(property_code, data[property_code])
+
+                    for transition in transitions:
+                        self.notifier.push_transitions(bacnet_object, transition)
+
+                    self.transmitter.push_collected_data(bacnet_object)
                     self.statistic_verified_object_count += 1
                 except:
-                    self.logger.exception()
+                    self.logger.exception("Failed verify object: {}".format(key))
             time.sleep(0.01)
 
 
@@ -424,12 +601,19 @@ class VisiobasThreadDataCollector(Thread):
                  period: float = 0.01):
         super().__init__()
         self.thread_idx = thread_idx
-        self.objects = []
+        self.data_pooling = []
         self.verifier = verifier
         self.bacnet_network = bacnet_network
         # self.transmitter = transmitter
         self.logger = logging.getLogger('visiobas.data_collector.collector')
         self.period = period
+        self.pooling_fields = [
+            ObjectProperty.OUT_OF_SERVICE.id(),
+            ObjectProperty.PRESENT_VALUE.id(),
+            ObjectProperty.RELIABILITY.id(),
+            ObjectProperty.STATUS_FLAGS.id(),
+            ObjectProperty.PRIORITY_ARRAY.id()
+        ]
         # statistic logging
         self.statistic_parsed_object_count = 0
         self.statistic_log_period = 10
@@ -437,31 +621,32 @@ class VisiobasThreadDataCollector(Thread):
         self.statistic_period_start = time.time()
 
     def add_object(self, bacnet_object: BACnetObject):
-        _device_id = bacnet_object.get_device_id()
-        _id = bacnet_object.get_id()
-        _type_code = bacnet_object.get_object_type_code()
-        _update_interval = bacnet_object.get_update_interval()
-        _reference = bacnet_object.get_object_reference()
-        device = self.bacnet_network.find_by_type(ObjectType.DEVICE, _device_id)
-        _read_app = device.get_read_app() if device is not None else None
+        # _device_id = bacnet_object.get_device_id()
+        # _id = bacnet_object.get_id()
+        # _type_code = bacnet_object.get_object_type_code()
+        # _update_interval = bacnet_object.get_update_interval()
+        # _reference = bacnet_object.get_object_reference()
+        device = self.bacnet_network.find_by_type(ObjectType.DEVICE, device_id)
+        read_app = device.get_read_app() if device is not None else None
 
-        self.objects.append({
-            "device_id": _device_id,
-            "object_type_code": _type_code,
-            "object_id": _id,
-            "object_reference": _reference,
-            "update_interval": _update_interval,
-            "original_update_interval": _update_interval,
+        self.data_pooling.append({
+            # "device_id": _device_id,
+            # "object_type_code": _type_code,
+            # "object_id": _id,
+            # "object_reference": _reference,
+            "update_interval": bacnet_object.get_update_interval(),
+            "original_update_interval": bacnet_object.get_update_interval(),
             "time_last_success_pooling": 0,
             # special delay for make uniform distribute of sensors pooling
             "update_delay": -1,
             "bacnet_object": bacnet_object,
-            "read_app": _read_app
+            "read_app": read_app
         })
 
     def run(self):
         if self.logger.isEnabledFor(logging.INFO):
-            self.logger.info("Collector# {} count of observable objects: {}".format(self.thread_idx, len(self.objects)))
+            self.logger.info(
+                "Collector# {} count of observable objects: {}".format(self.thread_idx, len(self.data_pooling)))
         while True:
             if self.logger.isEnabledFor(logging.INFO):
                 if time.time() - self.statistic_period_start > self.statistic_log_period:
@@ -473,63 +658,60 @@ class VisiobasThreadDataCollector(Thread):
 
             slicer = BACnetSlicer(config.visiobas.visiobas_slicer)
             now = time.time()
-            for _object in self.objects:
+            for pooling in self.data_pooling:
                 try:
-                    time_last_success_pooling = _object["time_last_success_pooling"]
-                    update_delay = _object["update_delay"]
-                    update_interval = _object["update_interval"]
-                    device_id = _object["device_id"]
-                    object_type_code = _object["object_type_code"]
-                    object_id = _object["object_id"]
-                    object_reference = _object["object_reference"]
-                    read_app = _object["read_app"]
-                    fields = [
-                        ObjectProperty.OUT_OF_SERVICE.id(),
-                        ObjectProperty.PRESENT_VALUE.id(),
-                        ObjectProperty.RELIABILITY.id(),
-                        ObjectProperty.STATUS_FLAGS.id(),
-                        ObjectProperty.PRIORITY_ARRAY.id()
-                    ]
+                    time_last_success_pooling = pooling["time_last_success_pooling"]
+                    update_delay = pooling["update_delay"]
+                    update_interval = pooling["update_interval"]
 
                     if now - time_last_success_pooling > update_interval:
                         # make sensor pooling distributed more uniformed
-                        _object["update_delay"] = randint(1, max(int(update_interval), 1)) \
+                        pooling["update_delay"] = randint(1, max(int(update_interval), 1)) \
                             if update_delay == -1 else 0
-                        _object["update_interval"] = _object["update_delay"] \
-                            if _object["update_delay"] > 0 else _object["original_update_interval"]
+                        pooling["update_interval"] = pooling["update_delay"] \
+                            if pooling["update_delay"] > 0 else pooling["original_update_interval"]
+
+                        bacnet_object = pooling["bacnet_object"]
+                        device_id = bacnet_object.get_device_id()  # pooling["device_id"]
+                        object_type_code = bacnet_object.get_object_type_code()  # pooling["object_type_code"]
+                        object_id = bacnet_object.get_id()  # pooling["object_id"]
+                        # object_reference = pooling["object_reference"]
+                        read_app = pooling["read_app"]
 
                         # execute BAC0 or other app
                         data = slicer.execute(read_app,
                                               device_id=device_id,
                                               object_type=object_type_code,
                                               object_id=object_id,
-                                              fields=fields)
+                                              fields=self.pooling_fields)
                         if len(data) == 0:
-                            logger.error("failed colled data of object: {}".format(object_reference))
-                            continue
+                            logger.error("Failed collect data of: {}".format(bacnet_object.get_object_reference()))
+                            data["fault"] = True
 
-                        _object["time_last_success_pooling"] = time.time()
+                        # TODO if data pooling failed? reset last success pooling ?
+                        pooling["time_last_success_pooling"] = time.time()
+
                         # prepare collected data and store to be transmitted to server
-                        if object_reference is not None:
-                            data[ObjectProperty.OBJECT_PROPERTY_REFERENCE.id()] = object_reference
-                        # convert present value to float
-                        if object_type_code == ObjectType.ANALOG_INPUT.code() or \
-                                object_type_code == ObjectType.ANALOG_OUTPUT.code() or \
-                                object_type_code == ObjectType.ANALOG_VALUE.code():
-                            data[ObjectProperty.PRESENT_VALUE.id()] = float(data[ObjectProperty.PRESENT_VALUE.id()])
-                        # convert present value to int
-                        elif object_type_code == ObjectType.MULTI_STATE_INPUT.code() or \
-                                object_type_code == ObjectType.MULTI_STATE_OUTPUT.code() or \
-                                object_type_code == ObjectType.MULTI_STATE_VALUE.code():
-                            data[ObjectProperty.PRESENT_VALUE.id()] = int(
-                                float(data[ObjectProperty.PRESENT_VALUE.id()]))
+                        # if object_reference is not None:
+                        #     data[ObjectProperty.OBJECT_PROPERTY_REFERENCE.id()] = object_reference
+                        # # convert present value to float
+                        # if object_type_code == ObjectType.ANALOG_INPUT.code() or \
+                        #         object_type_code == ObjectType.ANALOG_OUTPUT.code() or \
+                        #         object_type_code == ObjectType.ANALOG_VALUE.code():
+                        #     data[ObjectProperty.PRESENT_VALUE.id()] = float(data[ObjectProperty.PRESENT_VALUE.id()])
+                        # # convert present value to int
+                        # elif object_type_code == ObjectType.MULTI_STATE_INPUT.code() or \
+                        #         object_type_code == ObjectType.MULTI_STATE_OUTPUT.code() or \
+                        #         object_type_code == ObjectType.MULTI_STATE_VALUE.code():
+                        #     data[ObjectProperty.PRESENT_VALUE.id()] = int(
+                        #         float(data[ObjectProperty.PRESENT_VALUE.id()]))
                         # binary present value without changes actually it 'active' or 'inactive'
-                        data[ObjectProperty.OBJECT_IDENTIFIER.id()] = object_id
-                        data[ObjectProperty.DEVICE_ID.id()] = device_id
-                        data[ObjectProperty.OBJECT_TYPE.id()] = ObjectType.code_to_name(object_type_code)
+                        # data[ObjectProperty.OBJECT_IDENTIFIER.id()] = object_id
+                        # data[ObjectProperty.DEVICE_ID.id()] = device_id
+                        # data[ObjectProperty.OBJECT_TYPE.id()] = ObjectType.code_to_name(object_type_code)
                         # object (data) ready to transmit to server side
                         # transmitter.push_collected_data(data, _object["bacnet_object"])
-                        self.verifier.push_collected_data(data)
+                        self.verifier.push_collected_data(bacnet_object, data)
                         self.statistic_parsed_object_count += 1
                 except:
                     logger.error(traceback.format_exc())
@@ -596,9 +778,9 @@ if __name__ == '__main__':
             if not len(device_ids) == len(server_devices):
                 logger.warning("Not all bacwi table devices exist on server")
                 for address_cache_device in address_cache_devices:
-                    _device_id = address_cache_device['id']
+                    device_id = address_cache_device['id']
                     found = next((x for x in server_devices
-                                  if lambda d: d[ObjectProperty.OBJECT_IDENTIFIER.id()] == _device_id), None)
+                                  if lambda d: d[ObjectProperty.OBJECT_IDENTIFIER.id()] == device_id), None)
                     if found is None:
                         logger.warning("Device not found on server side: {}".format(address_cache_device))
 
@@ -606,8 +788,8 @@ if __name__ == '__main__':
             # group devices by port value
             # devices with different port value can be collected independently
             for address_cache_device in address_cache_devices:
-                _device_id = address_cache_device['id']
-                server_device = bacnet_network.find_by_type(ObjectType.DEVICE, _device_id)
+                device_id = address_cache_device['id']
+                server_device = bacnet_network.find_by_type(ObjectType.DEVICE, device_id)
                 if not server_device:
                     # if _device_id not in bacnet_objects:
                     logger.warning("Device not found: {}".format(address_cache_device))
@@ -712,15 +894,15 @@ if __name__ == '__main__':
                             if notification_class:
                                 assert (type(notification_class) == NotificationClass)
                                 bacnet_object.set_notification_object(notification_class)
-                            bacnet_network.append(o)
-                        data_collector_objects += objects
+                            bacnet_network.append(bacnet_object)
+                            data_collector_objects.append(bacnet_object)
 
                 collector = VisiobasThreadDataCollector(thread_idx, verifier, bacnet_network)
                 if logger.isEnabledFor(logging.INFO):
                     _device_ids = [x.get_id() for x in _devices]
                     logger.info("Collector# {} collect devices: {}".format(thread_idx, _device_ids))
-                for o in data_collector_objects:
-                    collector.add_object(BACnetObject(o))
+                for bacnet_object in data_collector_objects:
+                    collector.add_object(bacnet_object)
                 collector.start()
                 collectors.append(collector)
                 thread_idx += 1

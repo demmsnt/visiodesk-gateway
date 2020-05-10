@@ -359,15 +359,6 @@ bacnet_name_map = {
 }
 
 
-class Transition(enum.Enum):
-    TO_OFFNORMAL = 1
-    TO_FAULT = 2
-    TO_NORMAL = 3
-
-    def id(self):
-        return self.value
-
-
 class ObjectProperty(enum.Enum):
     ACKED_TRANSITIONS = '0'
     ACK_REQUIRED = '1'
@@ -795,20 +786,23 @@ class StatusFlag:
             except:
                 pass
 
+    def __str__(self) -> str:
+        return str(self.as_list())
+
     @staticmethod
     def create(in_alarm=False, fault=False, overridden=False, out_of_service=False):
         return [in_alarm, fault, overridden, out_of_service]
 
-    def get_in_alarm(self):
+    def get_in_alarm(self) -> bool:
         return self.in_alarm
 
-    def get_fault(self):
+    def get_fault(self) -> bool:
         return self.fault
 
-    def get_overridden(self):
+    def get_overridden(self) -> bool:
         return self.overridden
 
-    def get_out_of_service(self):
+    def get_out_of_service(self) -> bool:
         return self.out_of_service
 
     def set_in_alarm(self, flag: bool):
@@ -823,5 +817,17 @@ class StatusFlag:
     def set_out_of_service(self, flag: bool):
         self.out_of_service = flag
 
-    def as_list(self):
+    def as_list(self) -> list:
         return [self.in_alarm, self.fault, self.overridden, self.out_of_service]
+
+    def is_abnormal(self) -> bool:
+        """
+        object is abnormal if one of follow flag is enabled (IN_ALARM or FAULT or OUT_OF_SERVICE)
+        """
+        return self.in_alarm or self.fault or self.out_of_service
+
+    def is_normal(self) -> bool:
+        """
+        object is normal if it is not abnormal
+        """
+        return not self.is_abnormal()

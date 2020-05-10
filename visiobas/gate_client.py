@@ -2,6 +2,7 @@ from visiobas.client import VisiobasClient
 from bacnet.bacnet import ObjectType
 import json
 import logging
+import re
 
 
 # TODO why need VisiobasClient or VisiobasGateClient ? move all into VisiobasClient
@@ -143,3 +144,18 @@ class VisiobasGateClient(VisiobasClient):
         }
         js = json.dumps(data)
         return self.post(url, js, headers=headers)
+
+    def rq_vdesk_get_topic_by_id(self, topic_id: int):
+        url = "{}/vdesk/arm/getTopicById/{}".format(self.get_addr(), topic_id)
+        return self.get_json(url)
+
+    def __convert_to_url_reference(self, reference: str):
+        return "/".join(self.reference_as_list(reference))
+
+    @staticmethod
+    def reference_as_list(reference: str):
+        return re.split("[:.]", reference)
+
+    def rq_vbas_get_object(self, reference: str):
+        url = "{}/vbas/arm/getObject/{}".format(self.get_addr(), self.__convert_to_url_reference(reference))
+        return self.get_json(url)

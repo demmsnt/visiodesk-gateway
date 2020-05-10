@@ -44,6 +44,12 @@ class TestVisiobasGateClient(unittest.TestCase):
     def tearDown(self):
         self.client.rq_logout()
 
+    def test_get_object(self):
+        o = self.client.rq_vbas_get_object("Site:Blok_A/Temperature")
+        self.assertIsNotNone(o)
+        self.assertEqual("Site:Blok_A/Temperature", o[ObjectProperty.OBJECT_PROPERTY_REFERENCE.id()])
+        print(o)
+
     def test_rq_device_list(self):
         devices = self.client.rq_devices()
         self.assertTrue(type(devices) is list)
@@ -225,6 +231,11 @@ class TestVisiobasGateClient(unittest.TestCase):
         self.assertTrue(type(topics) is list)
         for topic in topics:
             print(topic)
+
+    def test_rq_vdesk_get_topic_by_id(self):
+        topic = self.client.rq_vdesk_get_topic_by_id(1)
+        self.assertIsNotNone(topic)
+        print(topic)
 
 
 # ERROR 2020-04-19 20:44:09,596 __main__ run      Failed put data: {'79': 'analog-input', '75': 25307.0, '85': '52.13', '846': 200}

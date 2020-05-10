@@ -59,3 +59,9 @@ class TopicPriority(enum.Enum):
 
     def name(self):
         return self.value[1]
+
+    @staticmethod
+    def from_id(id: int):
+        for priority in TopicPriority:
+            if priority.id() == id:
+                return priority

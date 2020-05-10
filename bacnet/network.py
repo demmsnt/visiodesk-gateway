@@ -6,7 +6,9 @@ from visiobas.object.bacnet_object import NotificationClass
 
 
 class BACnetNetwork:
-
+    """
+    Storage of BACnet objects
+    """
     def __init__(self) -> None:
         super().__init__()
         self.objects = {}
