@@ -1,0 +1,1 @@
+python data_collector.py --device 101 --object 0 --enable_verifier 0 --enable_transmitter 0 --enable_notifier 0
