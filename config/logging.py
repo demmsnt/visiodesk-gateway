@@ -8,12 +8,6 @@ from logging.handlers import RotatingFileHandler
 def initialize_logging(level=logging.INFO):
     if not os.path.exists("logs"):
         os.mkdir("logs")
-    # logging.basicConfig(
-    #     format='%(levelname)s %(asctime)-15s %(name)s %(funcName)-8s %(message)s',
-    #     filename='visiobas.log',
-    #     level=logging.INFO)
-
-    # level = logging.INFO
 
     console = logging.StreamHandler(sys.stdout)
     console.setFormatter(logging.Formatter('%(levelname)s %(asctime)-15s %(name)s %(funcName)-8s %(message)s'))
@@ -35,11 +29,11 @@ def initialize_logging(level=logging.INFO):
         'visiobas.data_collector.collector': logging.getLogger('visiobas.data_collector.collector'),
         'visiobas.data_collector.transmitter': logging.getLogger('visiobas.data_collector.transmitter')
     }
-    for name in loggers:
-        logger = loggers[name]
-        logger.addHandler(console)
-        logger.addHandler(file)
-        logger.setLevel(level)
+    # for name in loggers:
+    #     logger = loggers[name]
+    #     logger.addHandler(console)
+    #     logger.addHandler(file)
+    #     logger.setLevel(level)
 
     # loggers['bacnet.parser'].setLevel(logging.DEBUG)
     # loggers['bacnet.slicer'].setLevel(logging.DEBUG)

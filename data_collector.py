@@ -533,7 +533,7 @@ class VisiobasThreadDataCollector(Thread):
 
 # entry point of data_collector
 if __name__ == '__main__':
-    config.logging.initialize_logging(logging.DEBUG)
+    config.logging.initialize_logging()
     logger = logging.getLogger('visiobas.data_collector')
     argparser = argparse.ArgumentParser()
     argparser.add_argument("--device", type=int)
