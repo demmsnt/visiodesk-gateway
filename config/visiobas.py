@@ -28,4 +28,4 @@ __mria = {
     }
 }
 
-visiobas_server = __local
+visiobas_server = __mria
