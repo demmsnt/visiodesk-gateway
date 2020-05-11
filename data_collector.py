@@ -8,9 +8,7 @@ from random import randint
 import argparse
 
 import config.visiobas
-import config.visiobas
-from bacnet.bacnet import ObjectProperty, StatusFlag
-from bacnet.bacnet import ObjectType
+from bacnet.bacnet import ObjectProperty, StatusFlags, StatusFlag, ObjectType
 from bacnet.parser import BACnetParser
 from bacnet.slicer import BACnetSlicer
 from visiobas.gate_client import VisiobasGateClient
@@ -352,25 +350,6 @@ class VisiobasNotifier(Thread):
                 try:
                     bacnet_object, transition = self.transitions.pop(key)
                     self.__create_notification(bacnet_object, transition)
-                    # bacnet_object = self.bacnet_network.find()
-                    # data = self.transitions.pop(key)
-                    # reference = data[ObjectProperty.OBJECT_PROPERTY_REFERENCE.id()]
-                    # bacnet_object = bacnet_network.find(reference)
-                    # if bacnet_object is None:
-                    #    continue
-                    # if id not in self.bacnet_objects:
-                    #    continue
-                    # bacnet_object = self.bacnet_objects[id]
-                    # notification_class = bacnet_object.get_notification_object()
-                    # if notification_class is None:
-                    #     continue
-                    #
-                    # if transition == Transition.TO_OFFNORMAL:
-                    #     self.__create_notification_to_offnormal(bacnet_object, notification_class)
-                    # elif transition == Transition.TO_FAULT:
-                    #     self.create_notification_to_fault(bacnet_object, notification_class)
-                    # elif transition == Transition.TO_NORMAL:
-                    #     self.__create_notification_to_offnormal()
                 except:
                     self.logger.exception("Failed create notification of: {}".format(key))
 
@@ -447,7 +426,6 @@ class VisiobasDataVerifier(Thread):
             return
         try:
             key = bacnet_object.get_object_reference()
-            # id = data[ObjectProperty.OBJECT_IDENTIFIER.id()]
             self.collected_data[key] = (bacnet_object, data)
         except:
             self.logger.exception("Failed put collected data: {} object: {}".format(data, bacnet_object))
@@ -487,6 +465,36 @@ class VisiobasDataVerifier(Thread):
                 object_type_code == ObjectType.MULTI_STATE_VALUE.code():
             return self.verify_multistate_out_of_limit(bacnet_object, data)
 
+    def verify_to_fault_transition(self, bacnet_object: BACnetObject, data: dict):
+        """
+        verify bacnet_object state and new collected data
+        return transition and flags state if necessary
+        """
+        data_reliability = data[ObjectProperty.RELIABILITY.id()] \
+            if ObjectProperty.RELIABILITY.id() in data else "no-fault-detected"
+        data_flags = StatusFlags(data[ObjectProperty.STATUS_FLAGS.id()]
+                                 if ObjectProperty.STATUS_FLAGS.id() in data else None)
+
+        transition = None
+        fault_flag = bacnet_object.get_status_flag(StatusFlag.FAULT)
+
+        # handle TO_FAULT object transition
+        if "fault" in data:
+            # data point not available, probably it offline
+            if not fault_flag:
+                fault_flag = True
+                transition = Transition.TO_FAULT
+        else:
+            # verification FAULT flag after object data collection
+            if data_flags.get_fault() or not data_reliability == "no-fault-detected":
+                if not fault_flag:
+                    fault_flag = True
+                    transition = Transition.TO_FAULT
+            elif fault_flag:
+                # return FAULT flag to normal after object restore data collection for instance
+                fault_flag = False
+        return (StatusFlag.FAULT, fault_flag), transition
+
     def run(self) -> None:
         while True:
             if self.logger.isEnabledFor(logging.INFO):
@@ -515,13 +523,13 @@ class VisiobasDataVerifier(Thread):
 
                     transitions = []
 
-                    flags0 = StatusFlag(bacnet_object.get_status_flags().copy())
-                    flags1 = StatusFlag(bacnet_object.get_status_flags().copy())
+                    flags0 = StatusFlags(bacnet_object.get_status_flags().copy())
+                    flags1 = StatusFlags(bacnet_object.get_status_flags().copy())
 
                     data_reliability = data[ObjectProperty.RELIABILITY.id()] \
                         if ObjectProperty.RELIABILITY.id() in data else "no-fault-detected"
-                    data_flags = StatusFlag(data[ObjectProperty.STATUS_FLAGS.id()]
-                                            if ObjectProperty.STATUS_FLAGS.id() in data else None)
+                    data_flags = StatusFlags(data[ObjectProperty.STATUS_FLAGS.id()]
+                                             if ObjectProperty.STATUS_FLAGS.id() in data else None)
 
                     # handle TO_FAULT object transition
                     if "fault" in data:

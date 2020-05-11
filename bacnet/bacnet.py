@@ -1,5 +1,16 @@
 import enum
 
+
+class StatusFlag(enum.Enum):
+    IN_ALARM = 0
+    FAULT = 1
+    OVERRIDEN = 2
+    OUT_OF_SERVICE = 3
+
+    def id(self):
+        return self.value
+
+
 bacnet_name_map = {
     "acked-transitions": "0",
     "ack-required": "1",
@@ -770,7 +781,7 @@ class ObjectType(enum.Enum):
         return None
 
 
-class StatusFlag:
+class StatusFlags:
     def __init__(self, status_flags: list = None) -> None:
         self.in_alarm = False
         self.fault = False

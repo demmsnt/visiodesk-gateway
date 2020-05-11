@@ -1,6 +1,6 @@
 import enum
 import json
-from bacnet.bacnet import ObjectProperty, ObjectType
+from bacnet.bacnet import ObjectProperty, ObjectType, StatusFlags, StatusFlag
 from visiobas.visiodesk import TopicPriority
 
 
@@ -126,11 +126,20 @@ class BACnetObject:
     def get_data(self):
         return self._data
 
+    def set_status_flag(self, status_flag: StatusFlag, value: bool):
+        status_flags = self.get_status_flags()
+        status_flags[status_flag.id()] = value
+        self.set_status_flags(status_flags)
+
     def get_status_flags(self):
         return self.get(ObjectProperty.STATUS_FLAGS, [False, False, False, False])
 
-    def set_status_flags(self, flags: list):
+    def set_status_flags(self, flags):
+        flags = flags.as_list() if type(flags) == StatusFlags else flags
         self.set(ObjectProperty.STATUS_FLAGS, flags)
+
+    def get_status_flag(self, status_flag: StatusFlag):
+        return self.get_status_flags()[status_flag.id()]
 
     def get_reliability(self):
         return self.get(ObjectProperty.RELIABILITY, "no-fault-detected")
