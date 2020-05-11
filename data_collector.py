@@ -541,27 +541,9 @@ class VisiobasDataVerifier(Thread):
             for key in keys:
                 try:
                     bacnet_object, data = self.collected_data.pop(key)
-
-                    # process status flags
-                    # {IN_ALARM, FAULT, OVERRIDDEN, OUT_OF_SERVICE}
-                    # IN_ALARM logical FALSE (0) if the Event_State property has a value of NORMAL, otherwise TRUE (1)
-                    # FAULT logical TRUE (1) if the reliability property is present and does not have a value of NO_FAULT_DETECTED otherwise FALSE (0)
-                    # OVERRIDEN logical TRUE (1) if the point has been overriden by some mechanism local to the BACnet DEvice, otherwise FALSE (0)
-                    # OUT_OF_SERVICE logical TRUE (1) if Out_Of_Service property has a value of TRUE otherwise FALSE (0)
-
-                    # reference = data[ObjectProperty.OBJECT_PROPERTY_REFERENCE.id()]
-                    # bacnet_object = self.bacnet_network.find(reference)
-                    # assert (bacnet_object)
-
                     transitions = []
-
                     flags0 = StatusFlags(bacnet_object.get_status_flags().copy())
                     flags1 = StatusFlags(bacnet_object.get_status_flags().copy())
-
-                    # data_reliability = data[ObjectProperty.RELIABILITY.id()] \
-                    #     if ObjectProperty.RELIABILITY.id() in data else "no-fault-detected"
-                    # data_flags = StatusFlags(data[ObjectProperty.STATUS_FLAGS.id()]
-                    #                          if ObjectProperty.STATUS_FLAGS.id() in data else None)
 
                     fault_flag, transition = self.verify_to_fault_transition(bacnet_object, data)
                     flags1.set_fault(fault_flag)
@@ -572,39 +554,6 @@ class VisiobasDataVerifier(Thread):
                     flags1.set_in_alarm(in_alarm_flag)
                     if transition:
                         transitions.append(transition)
-
-                    # # handle TO_FAULT object transition
-                    # if "fault" in data:
-                    #     # data point not available, probably it offline
-                    #     if not flags0.get_fault():
-                    #         flags1.set_fault(True)
-                    #         transitions.append(Transition.TO_FAULT)
-                    # else:
-                    #     # verification FAULT flag after object data collection
-                    #     if data_flags.get_fault() or not data_reliability == "no-fault-detected":
-                    #         if not flags0.get_fault():
-                    #             flags1.set_fault(True)
-                    #             transitions.append(Transition.TO_FAULT)
-                    #     elif flags0.get_fault():
-                    #         # return FAULT flag to normal after object restore data collection for instance
-                    #         flags1.set_fault(False)
-                    #
-                    # # handle TO_ALARM object transition
-                    # if bacnet_object.get_event_detection_enable():
-                    #     is_out_of_limit = self.verify_object_out_of_limit(bacnet_object, data)
-                    #     if is_out_of_limit and not flags0.get_in_alarm():
-                    #         flags1.set_in_alarm(True)
-                    #         transitions.append(Transition.TO_OFFNORMAL)
-                    #         # self.notifier.push_collected_data(data, Transition.TO_OFFNORMAL)
-                    #         # status_flags = StatusFlag(data[ObjectProperty.STATUS_FLAGS.id()])
-                    #         # TODO need to verify does need to establish in_alarm flag or not?
-                    #         # status_flags.set_in_alarm(True)
-                    #         # data[ObjectProperty.STATUS_FLAGS.id()] = status_flags.as_list()
-                    #     elif not is_out_of_limit:
-                    #         flags1.set_in_alarm(False)
-                    # elif flags0.get_in_alarm():
-                    #     # restore IN_ALARM flag if event detection disable
-                    #     flags1.set_in_alarm(False)
 
                     # handle TO_NORMAL object transition
                     if flags0.is_abnormal() and flags1.is_normal():
@@ -621,8 +570,6 @@ class VisiobasDataVerifier(Thread):
                         for property_code in data:
                             if property_code == ObjectProperty.STATUS_FLAGS.id():
                                 bacnet_object.set_status_flags(flags1.as_list())
-                            # elif property_code == ObjectProperty.RELIABILITY.id():
-                            #     bacnet_object.set_reliability(data_reliability)
                             elif property_code == ObjectProperty.PRESENT_VALUE.id():
                                 object_type_code = bacnet_object.get_object_type_code()
                                 if object_type_code == ObjectType.ANALOG_INPUT.code() or \
