@@ -64,6 +64,7 @@ class BACnetSlicer:
             try:
                 self.parser.parse_bacrp(output, field, data)
             except:
+                self.logger.error("bacrpm {}".format(" ".join(args)))
                 self.logger.exception("Failed parse bacrp output:\n{}".format(output))
         return data
 
@@ -85,4 +86,5 @@ class BACnetSlicer:
             output = "BACnet Reject: Unrecognized Service"
             return self.parser.parse_bacrpm(output)
         except Exception as e:
+            self.logger.error("bacrpm {}".format(" ".join(args)))
             self.logger.exception("Failed parse bacrpm, output:\n{}".format(output))
