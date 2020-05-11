@@ -62,7 +62,7 @@ class TestVisiobasDataCollector(unittest.TestCase):
         bacnet_object.set_status_flags(status_flags)
         in_alarm, transition = verifier.verify_to_offnormal_transition(bacnet_object, data)
         self.assertEqual(in_alarm, False)
-        self.assertEqual(transition, None)
+        self.assertEqual(transition, Transition.RESOLVE_OFFNORMAL)
 
         # Not Transition, because of collected data is FAULT
         # StatusFlat.IN_ALARM stay unchanged
@@ -146,7 +146,7 @@ class TestVisiobasDataCollector(unittest.TestCase):
             ObjectProperty.RELIABILITY.id(): "no-fault-detected"
         }
         fault, transition = verifier.verify_to_fault_transition(bacnet_object, data)
-        self.assertEqual(transition, None)
+        self.assertEqual(transition, Transition.RESOLVE_FAULT)
         self.assertEqual(fault, False)
 
 

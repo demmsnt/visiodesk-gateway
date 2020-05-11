@@ -8,6 +8,8 @@ class Transition(enum.Enum):
     TO_OFFNORMAL = 0
     TO_FAULT = 1
     TO_NORMAL = 2
+    RESOLVE_OFFNORMAL = 3
+    RESOLVE_FAULT = 4
 
     def id(self):
         return self.value
@@ -20,6 +22,19 @@ class BACnetObject:
         self._default_update_interval = 3600
         self.property_list = None
         self.notification_object = None
+
+        # copy TO_NORMAL message into transitions RESOLVE_OFFNORMAL & RESOLVE_FAULT
+        if ObjectProperty.EVENT_MESSAGE_TEXTS.id() in self._data:
+            texts = self._data[ObjectProperty.EVENT_MESSAGE_TEXTS.id()]
+            if len(texts) == 3:
+                text_to_normal = texts[2]
+                texts += [text_to_normal, text_to_normal]
+
+        if ObjectProperty.EVENT_ENABLE.id() in self._data:
+            event_enable = self._data[ObjectProperty.EVENT_ENABLE.id()]
+            if len(event_enable) == 3:
+                # allow event transition RESOLVE_OFFNORMAL & RESOLVE_FAULT
+                event_enable += [True, True]
 
     def __str__(self) -> str:
         return "({}, {}) {}".format(self.get_object_type_name(), self.get_id(), self.get_object_reference())
@@ -148,7 +163,7 @@ class BACnetObject:
         self.set(ObjectProperty.RELIABILITY, reliability)
 
     def get_event_message_texts(self):
-        return self.get(ObjectProperty.EVENT_MESSAGE_TEXTS, ["", "", ""])
+        return self.get(ObjectProperty.EVENT_MESSAGE_TEXTS, ["", "", "", ""])
 
     def get_event_message_text(self, transition: Transition):
         try:
@@ -238,6 +253,14 @@ class Device(BACnetObject):
 class NotificationClass(BACnetObject):
     def __init__(self, data):
         super().__init__(data)
+
+        # append recipient transitions
+        recipients = self.get_recipient_list()
+        for recipient in recipients:
+            if "transitions" in recipient:
+                transitions = recipient["transitions"]
+                if len(transitions) == 3:
+                    transitions += [transitions[Transition.TO_OFFNORMAL.id()], transitions[Transition.TO_FAULT.id()]]
 
     def get_recipient_list(self):
         recipient_list = self.get(ObjectProperty.RECIPIENT_LIST)

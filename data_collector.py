@@ -157,30 +157,45 @@ class VisiobasNotifier(Thread):
         return text.startswith("~System Notification~")
 
     @staticmethod
-    def __create_system_topic_item_text(group_name, bacnet_object):
+    def __create_system_topic_item_text(group_name, bacnet_object, transition):
         return "\n".join([
             "~System Notification~",
             "Group: {}".format(group_name),
-            "Reference: {}".format(bacnet_object.get_object_reference())
+            "Reference: {}".format(bacnet_object.get_object_reference()),
+            "Transition: {}".format(transition)
         ])
 
     @staticmethod
     def __decode_system_topic_item_text(text):
         group_name = -1
         reference = ""
+        transition = None
         for line in text.split("\n"):
             if line.startswith("Group:"):
                 group_name = line[len("Group:"):].strip()
             elif line.startswith("Reference:"):
                 reference = line[len("Reference:"):].strip()
+            elif line.startswith("Transition:"):
+                transition = line[len("Transition:"):].strip()
         return {
             "group_name": group_name,
-            "reference": reference
+            "reference": reference,
+            "transition": transition
         }
 
-    def __find_topic_id(self, group_name, reference):
+    def __create_topic_id_cache_key(self, group_name, bacnet_object, transition):
+        transition = Transition.TO_FAULT if transition == Transition.RESOLVE_FAULT else transition
+        transition = Transition.TO_OFFNORMAL if transition == Transition.RESOLVE_OFFNORMAL else transition
+        reference = bacnet_object.get_object_reference()
+        return group_name + "_" + str(transition) + "_" + reference
+
+    def __find_topic_id(self, group_name, bacnet_object, transition):
+        transition = Transition.TO_FAULT if transition == Transition.RESOLVE_FAULT else transition
+        transition = Transition.TO_OFFNORMAL if transition == Transition.RESOLVE_OFFNORMAL else transition
+        reference = bacnet_object.get_object_reference()
+
         try:
-            key = group_name + "_" + reference
+            key = self.__create_topic_id_cache_key(group_name, bacnet_object, transition)
             if key in self.topic_id_cache:
                 # TODO does topic still exist on server?
                 return self.topic_id_cache[key]
@@ -193,7 +208,9 @@ class VisiobasNotifier(Thread):
                     if item["type"]["id"] == visiodesk.ItemType.MESSAGE.id():
                         if self.__is_system_topic_item_text(item["text"]):
                             decoded = self.__decode_system_topic_item_text(item["text"])
-                            if decoded["group_name"] == group_name and decoded["reference"] == reference:
+                            if decoded["group_name"] == group_name \
+                                    and decoded["reference"] == reference \
+                                    and decoded["transition"] == str(transition):
                                 self.topic_id_cache[key] = topic["id"]
                                 return topic["id"]
             return None
@@ -260,7 +277,7 @@ class VisiobasNotifier(Thread):
                     "type": {
                         "id": visiodesk.ItemType.MESSAGE.id()
                     },
-                    "text": self.__create_system_topic_item_text(group_name, bacnet_object),
+                    "text": self.__create_system_topic_item_text(group_name, bacnet_object, transition),
                     "name": "Сообщение",
                     "like": 0
                 },
@@ -277,7 +294,7 @@ class VisiobasNotifier(Thread):
             "description": topic_description
         }
         topic = self.client.rq_vdesk_add_topic(data)
-        key = group_name + "_" + reference
+        key = self.__create_topic_id_cache_key(group_name, bacnet_object, transition)
         self.topic_id_cache[key] = topic["id"]
         print(topic)
 
@@ -314,18 +331,25 @@ class VisiobasNotifier(Thread):
         recipients = notification_class.get_recipient_list()
         for recipient in recipients:
             group_name = recipient["recipient"] if "recipient" in recipient else None
-            transitions = recipient["transitions"] if "transitions" in recipient else None
-            if not group_name or not transitions:
+            notification_transition_allows = recipient["transitions"] if "transitions" in recipient else None
+            if not group_name or not notification_transition_allows:
                 continue
-            topic_id = self.__find_topic_id(group_name, bacnet_object.get_object_reference())
+            if not bacnet_object.is_notification_allowed(transition):
+                continue
+            if not notification_transition_allows[transition.id()]:
+                continue
+
+            topic_id = self.__find_topic_id(group_name, bacnet_object, transition)
             if topic_id is None:
-                notification_allowed = bacnet_object.is_notification_allowed(transition) \
-                                       and transitions[transition.id()]
-                if notification_allowed:
-                    self.__create_topic(group_name, bacnet_object, transition)
+                # this cases should be always False but for any case
+                if transition == Transition.RESOLVE_OFFNORMAL:
+                    continue
+                if transition == Transition.RESOLVE_FAULT:
+                    continue
+                self.__create_topic(group_name, bacnet_object, transition)
             else:
-                self.__append_transition_text_if_necessary(topic_id, bacnet_object)
-                self.__change_status_if_necessary(topic_id, bacnet_object)
+                self.__append_transition_text_into_topic(topic_id, bacnet_object, transition)
+                # self.__change_status_if_necessary(topic_id, bacnet_object)
 
     # def __create_notification_to_offnormal(self, bacnet_object: BACnetObject, notification_class: NotificationClass):
     #     topic = self.__find_topic_id(bacnet_object.get_object_reference())
@@ -368,33 +392,20 @@ class VisiobasNotifier(Thread):
             self.logger.exception("Failed get topic title: {}".format(bacnet_object))
         return None
 
-    def __append_transition_text_if_necessary(self, topic_id, bacnet_object):
-        # TODO add transition text into topic if necessary
-        pass
-        # try:
-        #     topic = self.client.rq_vdesk_get_topic_by_id(topic_id)
-        #     items = topic["items"]
-        #     last_status_id = None
-        #     for item in items:
-        #         if item["type"]["id"] == visiodesk.ItemType.STATUS.id():
-        #             last_status_id = item["status"]["id"]
-        #     if last_status_id == visiodesk.TopicStatus.RESOLVED.id():
-        #         self.client.rq_vdesk_add_topic_items([{
-        #             "type": {
-        #                 "id": visiodesk.ItemType.STATUS.id()
-        #             },
-        #             "status": {
-        #                 "id": visiodesk.TopicStatus.NEW.id()
-        #             },
-        #             "text": visiodesk.TopicStatus.NEW.name(),
-        #             "name": "Новая",
-        #             "like": 0,
-        #             "topic": {
-        #                 "id": topic["id"]
-        #             }
-        #         }])
-        # except:
-        #     self.logger.exception("Failed change topic status, topic id: {} object: {}".format(topic_id, bacnet_object))
+    def __append_transition_text_into_topic(self, topic_id: int, bacnet_object: BACnetObject, transition: Transition):
+        try:
+            self.client.rq_vdesk_add_topic_items([{
+                "type": {
+                    "id": visiodesk.ItemType.MESSAGE.id()
+                },
+                "text": bacnet_object.get_event_message_text(transition),
+                "like": 0,
+                "topic": {
+                    "id": topic_id
+                }
+            }])
+        except:
+            self.logger.exception("Failed append transition text, topic: {} object: {}".format(topic_id, bacnet_object))
 
 
 class VisiobasDataVerifier(Thread):
@@ -494,6 +505,7 @@ class VisiobasDataVerifier(Thread):
             elif fault_flag:
                 # return FAULT flag to normal after object restore data collection for instance
                 fault_flag = False
+                transition = Transition.RESOLVE_FAULT
         return fault_flag, transition
 
     def verify_to_offnormal_transition(self, bacnet_object: BACnetObject, data: dict):
@@ -520,6 +532,8 @@ class VisiobasDataVerifier(Thread):
                     in_alarm_flag = True
                     transition = Transition.TO_OFFNORMAL
                 elif not is_out_of_limit:
+                    if in_alarm_flag:
+                        transition = Transition.RESOLVE_OFFNORMAL
                     in_alarm_flag = False
             elif in_alarm_flag:
                 # restore IN_ALARM flag if event detection disable
