@@ -48,6 +48,7 @@ __Start data collector by CLI__
 execute data_collector.py with optional --help to get full cli help  
 *data collector* use *address_cache* file for it own purpose  
 only devices listed in address_cache used for collection  
+configuration stored into config.visiobas.py module    
 <pre>
 python ./data_collector.py
 </pre>
