@@ -26,13 +26,13 @@ class BACnetObject:
         # copy TO_NORMAL message into transitions RESOLVE_OFFNORMAL & RESOLVE_FAULT
         if ObjectProperty.EVENT_MESSAGE_TEXTS.id() in self._data:
             texts = self._data[ObjectProperty.EVENT_MESSAGE_TEXTS.id()]
-            if len(texts) == 3:
+            if texts is not None and len(texts) == 3:
                 text_to_normal = texts[2]
                 texts += [text_to_normal, text_to_normal]
 
         if ObjectProperty.EVENT_ENABLE.id() in self._data:
             event_enable = self._data[ObjectProperty.EVENT_ENABLE.id()]
-            if len(event_enable) == 3:
+            if event_enable is not None and len(event_enable) == 3:
                 # allow event transition RESOLVE_OFFNORMAL & RESOLVE_FAULT
                 event_enable += [True, True]
 
@@ -163,7 +163,7 @@ class BACnetObject:
         self.set(ObjectProperty.RELIABILITY, reliability)
 
     def get_event_message_texts(self):
-        return self.get(ObjectProperty.EVENT_MESSAGE_TEXTS, ["", "", "", ""])
+        return self.get(ObjectProperty.EVENT_MESSAGE_TEXTS, ["", "", "", "", ""])
 
     def get_event_message_text(self, transition: Transition):
         try:
@@ -173,7 +173,7 @@ class BACnetObject:
 
     def is_notification_allowed(self, transition: Transition):
         try:
-            return self.get(ObjectProperty.EVENT_ENABLE, [False, False, False])[transition.id()]
+            return self.get(ObjectProperty.EVENT_ENABLE, [False, False, False, False, False])[transition.id()]
         except:
             return False
 
