@@ -594,6 +594,8 @@ class VisiobasDataVerifier(Thread):
                                         object_type_code == ObjectType.MULTI_STATE_OUTPUT.code() or \
                                         object_type_code == ObjectType.MULTI_STATE_VALUE.code():
                                     bacnet_object.set_present_value(int(float(data[property_code])))
+                                else:
+                                    bacnet_object.set_present_value(data[property_code])
                             else:
                                 bacnet_object.set(property_code, data[property_code])
 
@@ -729,7 +731,7 @@ class VisiobasThreadDataCollector(Thread):
                         self.verifier.push_collected_data(bacnet_object, data)
                         self.statistic_parsed_object_count += 1
                 except:
-                    logger.error(traceback.format_exc())
+                    logger.exception("Failed execute slice")
             time.sleep(self.period)
 
 
