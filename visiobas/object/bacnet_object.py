@@ -37,7 +37,11 @@ class BACnetObject:
                 event_enable += [True, True]
 
     def __str__(self) -> str:
-        return "({}, {}) {}".format(self.get_object_type_name(), self.get_id(), self.get_object_reference())
+        id = self.get_id()
+        device_id = self.get_device_id()
+        reference = self.get_object_reference()
+        type_name = self.get_object_type_name()
+        return "({}, {}) device: {} {}".format(type_name, id, device_id, reference)
 
     def get(self, object_property, default=None):
         property_code = object_property.id() if type(object_property) == ObjectProperty else object_property

@@ -977,7 +977,7 @@ if __name__ == '__main__':
                 collectors.append(collector)
                 thread_idx += 1
 
-            if logger.isEnabledFor(logging.DEBUG):
+            if logger.isEnabledFor(logging.INFO):
                 if not os.path.exists("logs"):
                     os.mkdir("logs")
                 bacnet_network.save("logs/bacnet_network.txt")
