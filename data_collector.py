@@ -33,6 +33,14 @@ class Statistic(Thread):
         self.duration_notified_objects_sec = 0
         self.duration_send_objects_sec = 0
         self.duration_notified_objects = 0
+        self.devices_not_responding = set([])
+
+    def add_not_responding_device(self, device_id):
+        self.devices_not_responding.add(device_id)
+
+    def remove_not_responding_device(self, device_id):
+        if device_id in self.devices_not_responding:
+            self.devices_not_responding.remove(device_id)
 
     def enabled(self):
         return self.logger.isEnabledFor(logging.INFO)
@@ -65,6 +73,8 @@ class Statistic(Thread):
                          "\nverify and send... {}, total duration: {:.2f} sec, rate {:.2f} objects / sec".format(
             self.count_read_objects, self.duration_read_objects_sec, read_rate,
             verify_and_send_count, duration_verify_and_send, verify_and_send_rate))
+        if not len(self.devices_not_responding) == 0:
+            self.logger.info("NOT responding devices: {}".format(self.devices_not_responding))
 
     def run(self) -> None:
         while (True):
@@ -752,10 +762,13 @@ class VisiobasThreadDataCollector(Thread):
                             duration = time.time() - t0
                             statistic.update_read_object_statistic(1, duration)
                 if not shuffle_data_points_of_device_id == -1:
+                    statistic.add_not_responding_device(shuffle_data_points_of_device_id)
                     if logger.isEnabledFor(logging.INFO):
                         logger.info("Device pooling skipped: {}".format(shuffle_data_points_of_device_id))
                     shuffle(data_points)
                     shuffle_data_points_of_device_id = -1
+                else:
+                    statistic.remove_not_responding_device(shuffle_data_points_of_device_id)
             time.sleep(self.period)
 
 
@@ -836,23 +849,11 @@ if __name__ == '__main__':
                     logger.warning("Device not found: {}".format(address_cache_device))
                     continue
                 assert (type(server_device) == Device)
-                # server_device = bacnet_objects[_device_id]
-                # if not type(server_device) == Device:
-                #     logger.warning("Object is not device: {}".format(server_device))
-                #     continue
 
                 host = address_cache_device['host']
                 port = address_cache_device['port']
-                # server_device = None
-                # for device in server_devices:
-                #     if device[ObjectProperty.OBJECT_IDENTIFIER.id()] == _device_id:
-                #         server_device = device
-                #         break
-                # if server_device is None:
-                #     continue
 
                 # verify host and port equals on server device and bacwi device table
-                # server_device = Device(server_device)
                 if not host == server_device.get_host():
                     logger.warning("Server device {} host ({}) not equal with bacwi device host ({})".
                                    format(server_device.get_id(), server_device.get_host(), host))
