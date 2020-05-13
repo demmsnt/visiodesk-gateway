@@ -14,7 +14,7 @@ class BACnetSlicer:
         self.config = config
         self.parser = BACnetParser()
         self.logger = logging.getLogger('bacnet.slicer')
-        self.execute_bacrp_on_fail_bacrpm = False
+        self.execute_bacrp_on_fail_bacrpm = True
 
     def __execute_app(self, args, cwd):
         cp = subprocess.run(args, stdout=PIPE, stderr=PIPE, cwd=str(cwd))
