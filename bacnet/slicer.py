@@ -61,11 +61,12 @@ class BACnetSlicer:
                 str(field)
             ]
             output = self.__execute_app(args, path.parent)
-            try:
-                self.parser.parse_bacrp(output, field, data)
-            except:
-                self.logger.error("bacrpm {}".format(" ".join(args)))
-                self.logger.exception("Failed parse bacrp output:\n{}".format(output))
+            if output is not None and not len(output) == 0:
+                try:
+                    self.parser.parse_bacrp(output, field, data)
+                except:
+                    self.logger.error("bacrpm {}".format(" ".join(args)))
+                    self.logger.exception("Failed parse bacrp output:\n{}".format(output))
         return data
 
     def execute_bacrpm(self, device_id: int, object_type, object_id: int, fields: list):

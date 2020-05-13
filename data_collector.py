@@ -61,8 +61,8 @@ class Statistic(Thread):
         verify_and_send_count = self.count_verified_objects + self.count_send_objects
         duration_verify_and_send = self.duration_verify_objects_sec + self.duration_send_objects_sec
         verify_and_send_rate = verify_and_send_count / duration_verify_and_send
-        self.logger.info("\nread ............. {}, duration: {:.2f} sec, rate {:.2f} objects / sec"
-                         "\nverify and send... {}, duration: {:.2f} sec, rate {:.2f} objects / sec".format(
+        self.logger.info("\nread ............. {}, total duration: {:.2f} sec, rate {:.2f} objects / sec"
+                         "\nverify and send... {}, total duration: {:.2f} sec, rate {:.2f} objects / sec".format(
             self.count_read_objects, self.duration_read_objects_sec, read_rate,
             verify_and_send_count, duration_verify_and_send, verify_and_send_rate))
 
