@@ -611,6 +611,8 @@ class VisiobasDataVerifier(Thread):
             keys = list(self.collected_data.keys())
             for key in keys:
                 t0 = time.time()
+                bacnet_object = None
+                data = None
                 try:
                     bacnet_object, data = self.collected_data.pop(key)
                     transitions = []
@@ -669,7 +671,7 @@ class VisiobasDataVerifier(Thread):
 
                     self.transmitter.push_collected_data(bacnet_object)
                 except:
-                    self.logger.exception("Failed verify object: {}".format(key))
+                    self.logger.exception("Failed verify object: {} data: {}".format(bacnet_object, data))
                 if statistic.enabled():
                     duration = time.time() - t0
                     statistic.update_verified_object_statistic(1, duration)
