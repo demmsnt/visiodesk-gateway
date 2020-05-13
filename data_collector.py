@@ -717,6 +717,17 @@ class VisiobasThreadDataCollector(Thread):
         if self.logger.isEnabledFor(logging.INFO):
             self.logger.info(
                 "Collector# {} count of observable objects: {}".format(self.thread_idx, len(self.data_pooling)))
+
+        # skip pooling device if it not respond (3 times fault object response)
+        max_fault_count_before_skip = 3
+        fault_count = 0
+        skip_device_id = -1
+        unique_device_ids = set([])
+        for pooling in self.data_pooling:
+            bacnet_object = pooling["bacnet_object"]
+            unique_device_ids.add(bacnet_object.get_device_id())
+        enable_skip_device = len(unique_device_ids) > 1
+
         while True:
             slicer = BACnetSlicer(config.visiobas.visiobas_slicer)
             now = time.time()
@@ -742,10 +753,18 @@ class VisiobasThreadDataCollector(Thread):
                             if pooling["update_delay"] > 0 else pooling["original_update_interval"]
 
                         bacnet_object = pooling["bacnet_object"]
-                        device_id = bacnet_object.get_device_id()  # pooling["device_id"]
-                        object_type_code = bacnet_object.get_object_type_code()  # pooling["object_type_code"]
-                        object_id = bacnet_object.get_id()  # pooling["object_id"]
-                        # object_reference = pooling["object_reference"]
+
+                        if enable_skip_device:
+                            if not skip_device_id == -1:
+                                if skip_device_id == bacnet_object.get_device_id():
+                                    continue
+                                else:
+                                    skip_device_id = -1
+                                    fault_count = 0
+
+                        device_id = bacnet_object.get_device_id()
+                        object_type_code = bacnet_object.get_object_type_code()
+                        object_id = bacnet_object.get_id()
                         read_app = pooling["read_app"]
 
                         # execute BAC0 or other app
@@ -757,6 +776,12 @@ class VisiobasThreadDataCollector(Thread):
                         if len(data) == 0:
                             logger.error("Failed collect data of: {}".format(bacnet_object.get_object_reference()))
                             data["fault"] = True
+                            if enable_skip_device:
+                                fault_count += 1
+                                if fault_count >= max_fault_count_before_skip:
+                                    skip_device_id = device_id
+                                    logger.info("Skip device pooling: {} because of more then {} fault objects".format(
+                                        device_id, max_fault_count_before_skip))
 
                         # TODO if data pooling failed? reset last success pooling ?
                         pooling["time_last_success_pooling"] = time.time()
