@@ -652,6 +652,13 @@ class VisiobasDataVerifier(Thread):
                                         object_type_code == ObjectType.MULTI_STATE_OUTPUT.code() or \
                                         object_type_code == ObjectType.MULTI_STATE_VALUE.code():
                                     bacnet_object.set_present_value(int(float(data[property_code])))
+                                elif object_type_code == ObjectType.BINARY_INPUT.code() or \
+                                     object_type_code == ObjectType.BINARY_OUTPUT.code() or \
+                                     object_type_code == ObjectType.BINARY_VALUE.code():
+                                    v = data[property_code]
+                                    if type(v) == bool:
+                                        v = "active" if v else "inactive"
+                                    bacnet_object.set_present_value(v)
                                 else:
                                     bacnet_object.set_present_value(data[property_code])
                             else:
