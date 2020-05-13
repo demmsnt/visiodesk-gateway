@@ -20,6 +20,63 @@ import config.logging
 bacnet_network = BACnetNetwork()
 
 
+class Statistic(Thread):
+    def __init__(self) -> None:
+        super().__init__()
+        self.logger = logging.getLogger("visiobas.data_collector.statistic")
+        self.count_read_objects = 0
+        self.count_verified_objects = 0
+        self.count_notified_objects = 0
+        self.count_send_objects = 0
+        self.duration_read_objects_sec = 0
+        self.duration_verify_objects_sec = 0
+        self.duration_notified_objects_sec = 0
+        self.duration_send_objects_sec = 0
+        self.duration_notified_objects = 0
+
+    def enabled(self):
+        return self.logger.isEnabledFor(logging.INFO)
+
+    def update_read_object_statistic(self, inc, duration):
+        self.count_read_objects += inc
+        self.duration_read_objects_sec += duration
+
+    def update_verified_object_statistic(self, inc, duration):
+        self.count_verified_objects += inc
+        self.duration_verify_objects_sec += duration
+
+    def update_send_object_statistic(self, inc, duration):
+        self.count_send_objects += inc
+        self.duration_send_objects_sec += duration
+
+    def update_notified_object_statistic(self, inc, duration):
+        self.count_notified_objects += inc
+        self.duration_notified_objects += duration
+
+    def print_statistic(self):
+        if self.count_read_objects == 0:
+            return
+
+        read_rate = self.count_read_objects / self.duration_read_objects_sec
+        verify_and_send_count = self.count_verified_objects + self.count_send_objects
+        duration_verify_and_send = self.duration_verify_objects_sec + self.duration_send_objects_sec
+        verify_and_send_rate = verify_and_send_count / duration_verify_and_send
+        self.logger.info("\nread ............. {}, duration: {:.2f} sec, rate {:.2f} objects / sec"
+                         "\nverify and send... {}, duration: {:.2f} sec, rate {:.2f} objects / sec".format(
+            self.count_read_objects, self.duration_read_objects_sec, read_rate,
+            verify_and_send_count, duration_verify_and_send, verify_and_send_rate))
+
+    def run(self) -> None:
+        while (True):
+            time.sleep(10)
+            self.print_statistic()
+
+
+statistic = Statistic()
+statistic.setDaemon(True)
+statistic.start()
+
+
 class VisiobasTransmitter(Thread):
 
     def __init__(self, gate_client, period: int = 5):
@@ -44,10 +101,10 @@ class VisiobasTransmitter(Thread):
         ]
 
         # how many data was send by statistic period
-        self.statistic_send_object_count = 0
-        self.statistic_log_period = 10
-        self.statistic_send_start = time.time()
-        self.statistic_period_start = time.time()
+        # self.statistic_send_object_count = 0
+        # self.statistic_log_period = 10
+        # self.statistic_send_start = time.time()
+        # self.statistic_period_start = time.time()
         self.enabled = True
 
     def set_enable(self, enabled):
@@ -69,13 +126,12 @@ class VisiobasTransmitter(Thread):
 
     def run(self) -> None:
         while True:
-            if self.logger.isEnabledFor(logging.INFO):
-                if time.time() - self.statistic_period_start > self.statistic_log_period:
-                    self.statistic_period_start = time.time()
-                    count = self.statistic_send_object_count
-                    rate = float(float(count) / (time.time() - self.statistic_send_start))
-                    self.logger.info("Statistic send object: {}, rate: {:f} object / sec".format(count, rate))
-
+            # if self.logger.isEnabledFor(logging.INFO):
+            #     if time.time() - self.statistic_period_start > self.statistic_log_period:
+            #         self.statistic_period_start = time.time()
+            #         count = self.statistic_send_object_count
+            #         rate = float(float(count) / (time.time() - self.statistic_send_start))
+            #         self.logger.info("Statistic send object: {}, rate: {:f} object / sec".format(count, rate))
             if len(self.collected_data) == 0:
                 continue
             if len(self.device_ids) == 0:
@@ -93,6 +149,7 @@ class VisiobasTransmitter(Thread):
                     filter(lambda key: self.collected_data[key].get_device_id() == device_id, self.collected_data))
                 # remove from collected data grouped devices
                 request = []
+                t0 = time.time()
                 for key in keys_group_by_device:
                     try:
                         bacnet_object = self.collected_data.pop(key)
@@ -107,7 +164,9 @@ class VisiobasTransmitter(Thread):
                     self.gate_client.rq_put(device_id, request)
                 except Exception as e:
                     self.logger.exception("Failed put data: {}".format(request))
-                self.statistic_send_object_count += len(request)
+                if statistic.enabled():
+                    statistic.update_send_object_statistic(len(request), time.time() - t0)
+                # self.statistic_send_object_count += len(request)
             time.sleep(self.period)
 
 
@@ -424,10 +483,10 @@ class VisiobasDataVerifier(Thread):
         self.enabled = True
 
         # statistic logging
-        self.statistic_verified_object_count = 0
-        self.statistic_log_period = 10
-        self.statistic_start = time.time()
-        self.statistic_period_start = time.time()
+        # self.statistic_verified_object_count = 0
+        # self.statistic_log_period = 10
+        # self.statistic_start = time.time()
+        # self.statistic_period_start = time.time()
 
     def set_enable(self, enabled):
         self.enabled = enabled
@@ -543,16 +602,16 @@ class VisiobasDataVerifier(Thread):
 
     def run(self) -> None:
         while True:
-            if self.logger.isEnabledFor(logging.INFO):
-                if time.time() - self.statistic_period_start > self.statistic_log_period:
-                    self.statistic_period_start = time.time()
-                    count = self.statistic_verified_object_count
-                    rate = float(float(count) / (time.time() - self.statistic_start))
-                    self.logger.info(
-                        "Statistic verify and push for transmit: {}, rate: {:f} object / sec".format(count, rate))
-
+            # if self.logger.isEnabledFor(logging.INFO):
+            #     if time.time() - self.statistic_period_start > self.statistic_log_period:
+            #         self.statistic_period_start = time.time()
+            #         count = self.statistic_verified_object_count
+            #         rate = float(float(count) / (time.time() - self.statistic_start))
+            #         self.logger.info(
+            #             "Statistic verify and push for transmit: {}, rate: {:f} object / sec".format(count, rate))
             keys = list(self.collected_data.keys())
             for key in keys:
+                t0 = time.time()
                 try:
                     bacnet_object, data = self.collected_data.pop(key)
                     transitions = []
@@ -603,9 +662,12 @@ class VisiobasDataVerifier(Thread):
                         self.notifier.push_transitions(bacnet_object, transition)
 
                     self.transmitter.push_collected_data(bacnet_object)
-                    self.statistic_verified_object_count += 1
+                    # self.statistic_verified_object_count += 1
                 except:
                     self.logger.exception("Failed verify object: {}".format(key))
+                if statistic.enabled():
+                    duration = time.time() - t0
+                    statistic.update_verified_object_statistic(1, duration)
             time.sleep(0.01)
 
 
@@ -638,19 +700,10 @@ class VisiobasThreadDataCollector(Thread):
         self.statistic_period_start = time.time()
 
     def add_object(self, bacnet_object: BACnetObject):
-        # _device_id = bacnet_object.get_device_id()
-        # _id = bacnet_object.get_id()
-        # _type_code = bacnet_object.get_object_type_code()
-        # _update_interval = bacnet_object.get_update_interval()
-        # _reference = bacnet_object.get_object_reference()
         device = self.bacnet_network.find_by_type(ObjectType.DEVICE, device_id)
         read_app = device.get_read_app() if device is not None else None
 
         self.data_pooling.append({
-            # "device_id": _device_id,
-            # "object_type_code": _type_code,
-            # "object_id": _id,
-            # "object_reference": _reference,
             "update_interval": bacnet_object.get_update_interval(),
             "original_update_interval": bacnet_object.get_update_interval(),
             "time_last_success_pooling": 0,
@@ -665,23 +718,23 @@ class VisiobasThreadDataCollector(Thread):
             self.logger.info(
                 "Collector# {} count of observable objects: {}".format(self.thread_idx, len(self.data_pooling)))
         while True:
-            if self.logger.isEnabledFor(logging.INFO):
-                if time.time() - self.statistic_period_start > self.statistic_log_period:
-                    self.statistic_period_start = time.time()
-                    count = self.statistic_parsed_object_count
-                    rate = float(float(count) / (time.time() - self.statistic_start))
-                    self.logger.info(
-                        "Statistic parsed and push for verification: {}, rate: {:f} object / sec".format(count, rate))
-
             slicer = BACnetSlicer(config.visiobas.visiobas_slicer)
             now = time.time()
             for pooling in self.data_pooling:
-                try:
-                    time_last_success_pooling = pooling["time_last_success_pooling"]
-                    update_delay = pooling["update_delay"]
-                    update_interval = pooling["update_interval"]
-
-                    if now - time_last_success_pooling > update_interval:
+                # if self.logger.isEnabledFor(logging.INFO):
+                # if time.time() - self.statistic_period_start > self.statistic_log_period:
+                # self.statistic_period_start = time.time()
+                # count = self.statistic_parsed_object_count
+                # statistic.update_read_object_statistic(count, time.time() - now)
+                # rate = float(float(count) / (time.time() - self.statistic_start))
+                # self.logger.info(
+                #    "Statistic parsed and push for verification: {}, rate: {:f} object / sec".format(count, rate))
+                time_last_success_pooling = pooling["time_last_success_pooling"]
+                update_delay = pooling["update_delay"]
+                update_interval = pooling["update_interval"]
+                if now - time_last_success_pooling > update_interval:
+                    t0 = time.time()
+                    try:
                         # make sensor pooling distributed more uniformed
                         pooling["update_delay"] = randint(1, max(int(update_interval), 1)) \
                             if update_delay == -1 else 0
@@ -708,30 +761,13 @@ class VisiobasThreadDataCollector(Thread):
                         # TODO if data pooling failed? reset last success pooling ?
                         pooling["time_last_success_pooling"] = time.time()
 
-                        # prepare collected data and store to be transmitted to server
-                        # if object_reference is not None:
-                        #     data[ObjectProperty.OBJECT_PROPERTY_REFERENCE.id()] = object_reference
-                        # # convert present value to float
-                        # if object_type_code == ObjectType.ANALOG_INPUT.code() or \
-                        #         object_type_code == ObjectType.ANALOG_OUTPUT.code() or \
-                        #         object_type_code == ObjectType.ANALOG_VALUE.code():
-                        #     data[ObjectProperty.PRESENT_VALUE.id()] = float(data[ObjectProperty.PRESENT_VALUE.id()])
-                        # # convert present value to int
-                        # elif object_type_code == ObjectType.MULTI_STATE_INPUT.code() or \
-                        #         object_type_code == ObjectType.MULTI_STATE_OUTPUT.code() or \
-                        #         object_type_code == ObjectType.MULTI_STATE_VALUE.code():
-                        #     data[ObjectProperty.PRESENT_VALUE.id()] = int(
-                        #         float(data[ObjectProperty.PRESENT_VALUE.id()]))
-                        # binary present value without changes actually it 'active' or 'inactive'
-                        # data[ObjectProperty.OBJECT_IDENTIFIER.id()] = object_id
-                        # data[ObjectProperty.DEVICE_ID.id()] = device_id
-                        # data[ObjectProperty.OBJECT_TYPE.id()] = ObjectType.code_to_name(object_type_code)
-                        # object (data) ready to transmit to server side
-                        # transmitter.push_collected_data(data, _object["bacnet_object"])
                         self.verifier.push_collected_data(bacnet_object, data)
-                        self.statistic_parsed_object_count += 1
-                except:
-                    logger.exception("Failed execute slice")
+                        # self.statistic_parsed_object_count += 1
+                    except:
+                        logger.exception("Failed execute slice")
+                    if statistic.enabled():
+                        duration = time.time() - t0
+                        statistic.update_read_object_statistic(1, duration)
             time.sleep(self.period)
 
 

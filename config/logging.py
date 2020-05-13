@@ -5,7 +5,7 @@ import os
 from logging.handlers import RotatingFileHandler
 
 
-def initialize_logging(level=logging.DEBUG):
+def initialize_logging(level=logging.INFO):
     if not os.path.exists("logs"):
         os.mkdir("logs")
 
