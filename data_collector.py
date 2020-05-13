@@ -753,10 +753,10 @@ class VisiobasThreadDataCollector(Thread):
                             duration = time.time() - t0
                             statistic.update_read_object_statistic(1, duration)
                 if not shuffle_data_points_of_device_id == -1:
+                    if logger.isEnabledFor(logging.INFO):
+                        logger.info("Device pooling skipped: {}".format(shuffle_data_points_of_device_id))
                     shuffle(data_points)
                     shuffle_data_points_of_device_id = -1
-                    if logger.isEnabledFor(logging.INFO):
-                        logger.info("Device pooling skipped: {}".format(device_id))
             time.sleep(self.period)
 
 
