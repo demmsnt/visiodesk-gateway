@@ -4,7 +4,7 @@ import traceback
 import os
 from pathlib import Path
 from threading import Thread
-from random import randint
+from random import randint, shuffle
 import argparse
 
 import config.visiobas
@@ -99,12 +99,6 @@ class VisiobasTransmitter(Thread):
             ObjectProperty.STATUS_FLAGS.id(),
             ObjectProperty.PRIORITY_ARRAY.id()
         ]
-
-        # how many data was send by statistic period
-        # self.statistic_send_object_count = 0
-        # self.statistic_log_period = 10
-        # self.statistic_send_start = time.time()
-        # self.statistic_period_start = time.time()
         self.enabled = True
 
     def set_enable(self, enabled):
@@ -126,12 +120,6 @@ class VisiobasTransmitter(Thread):
 
     def run(self) -> None:
         while True:
-            # if self.logger.isEnabledFor(logging.INFO):
-            #     if time.time() - self.statistic_period_start > self.statistic_log_period:
-            #         self.statistic_period_start = time.time()
-            #         count = self.statistic_send_object_count
-            #         rate = float(float(count) / (time.time() - self.statistic_send_start))
-            #         self.logger.info("Statistic send object: {}, rate: {:f} object / sec".format(count, rate))
             if len(self.collected_data) == 0:
                 continue
             if len(self.device_ids) == 0:
@@ -166,7 +154,6 @@ class VisiobasTransmitter(Thread):
                     self.logger.exception("Failed put data: {}".format(request))
                 if statistic.enabled():
                     statistic.update_send_object_statistic(len(request), time.time() - t0)
-                # self.statistic_send_object_count += len(request)
             time.sleep(self.period)
 
 
@@ -482,12 +469,6 @@ class VisiobasDataVerifier(Thread):
         self.client = client
         self.enabled = True
 
-        # statistic logging
-        # self.statistic_verified_object_count = 0
-        # self.statistic_log_period = 10
-        # self.statistic_start = time.time()
-        # self.statistic_period_start = time.time()
-
     def set_enable(self, enabled):
         self.enabled = enabled
 
@@ -602,13 +583,6 @@ class VisiobasDataVerifier(Thread):
 
     def run(self) -> None:
         while True:
-            # if self.logger.isEnabledFor(logging.INFO):
-            #     if time.time() - self.statistic_period_start > self.statistic_log_period:
-            #         self.statistic_period_start = time.time()
-            #         count = self.statistic_verified_object_count
-            #         rate = float(float(count) / (time.time() - self.statistic_start))
-            #         self.logger.info(
-            #             "Statistic verify and push for transmit: {}, rate: {:f} object / sec".format(count, rate))
             keys = list(self.collected_data.keys())
             for key in keys:
                 t0 = time.time()
@@ -662,7 +636,6 @@ class VisiobasDataVerifier(Thread):
                         self.notifier.push_transitions(bacnet_object, transition)
 
                     self.transmitter.push_collected_data(bacnet_object)
-                    # self.statistic_verified_object_count += 1
                 except:
                     self.logger.exception("Failed verify object: {}".format(key))
                 if statistic.enabled():
@@ -680,7 +653,7 @@ class VisiobasThreadDataCollector(Thread):
                  period: float = 0.01):
         super().__init__()
         self.thread_idx = thread_idx
-        self.data_pooling = []
+        self.data_pooling = {}
         self.verifier = verifier
         self.bacnet_network = bacnet_network
         # self.transmitter = transmitter
@@ -693,17 +666,22 @@ class VisiobasThreadDataCollector(Thread):
             ObjectProperty.STATUS_FLAGS.id(),
             ObjectProperty.PRIORITY_ARRAY.id()
         ]
-        # statistic logging
-        self.statistic_parsed_object_count = 0
-        self.statistic_log_period = 10
-        self.statistic_start = time.time()
-        self.statistic_period_start = time.time()
 
     def add_object(self, bacnet_object: BACnetObject):
+        device_id = bacnet_object.get_device_id()
         device = self.bacnet_network.find_by_type(ObjectType.DEVICE, device_id)
+        if not device:
+            logger.warning("BACnet object does not have device: {}".format(bacnet_object))
+            return
         read_app = device.get_read_app() if device is not None else None
+        if read_app is None:
+            logger.warning("BACnet device does not have read app: {}".format(device))
+            return
 
-        self.data_pooling.append({
+        if device_id not in self.data_pooling:
+            self.data_pooling[device_id] = []
+
+        self.data_pooling[device_id].append({
             "update_interval": bacnet_object.get_update_interval(),
             "original_update_interval": bacnet_object.get_update_interval(),
             "time_last_success_pooling": 0,
@@ -715,84 +693,68 @@ class VisiobasThreadDataCollector(Thread):
 
     def run(self):
         if self.logger.isEnabledFor(logging.INFO):
-            self.logger.info(
-                "Collector# {} count of observable objects: {}".format(self.thread_idx, len(self.data_pooling)))
+            count = 0
+            for device_id in self.data_pooling:
+                count += len(self.data_pooling[device_id])
+            self.logger.info("Collector# {} count of observable objects: {}".format(self.thread_idx, count))
 
-        # skip pooling device if it not respond (3 times fault object response)
-        max_fault_count_before_skip = 3
-        fault_count = 0
-        skip_device_id = -1
-        unique_device_ids = set([])
-        for pooling in self.data_pooling:
-            bacnet_object = pooling["bacnet_object"]
-            unique_device_ids.add(bacnet_object.get_device_id())
-        enable_skip_device = len(unique_device_ids) > 1
+        # skip pooling device if it not respond (once fault object response)
+        shuffle_data_points_of_device_id = -1
+        enable_skip_device = len(self.data_pooling) > 1
 
         while True:
             slicer = BACnetSlicer(config.visiobas.visiobas_slicer)
             now = time.time()
-            for pooling in self.data_pooling:
-                # if self.logger.isEnabledFor(logging.INFO):
-                # if time.time() - self.statistic_period_start > self.statistic_log_period:
-                # self.statistic_period_start = time.time()
-                # count = self.statistic_parsed_object_count
-                # statistic.update_read_object_statistic(count, time.time() - now)
-                # rate = float(float(count) / (time.time() - self.statistic_start))
-                # self.logger.info(
-                #    "Statistic parsed and push for verification: {}, rate: {:f} object / sec".format(count, rate))
-                time_last_success_pooling = pooling["time_last_success_pooling"]
-                update_delay = pooling["update_delay"]
-                update_interval = pooling["update_interval"]
-                if now - time_last_success_pooling > update_interval:
-                    t0 = time.time()
-                    try:
-                        # make sensor pooling distributed more uniformed
-                        pooling["update_delay"] = randint(1, max(int(update_interval), 1)) \
-                            if update_delay == -1 else 0
-                        pooling["update_interval"] = pooling["update_delay"] \
-                            if pooling["update_delay"] > 0 else pooling["original_update_interval"]
+            for device_id in self.data_pooling:
+                data_points = self.data_pooling[device_id]
+                for pooling in data_points:
+                    time_last_success_pooling = pooling["time_last_success_pooling"]
+                    update_delay = pooling["update_delay"]
+                    update_interval = pooling["update_interval"]
+                    if now - time_last_success_pooling > update_interval:
+                        t0 = time.time()
+                        try:
+                            # make sensor pooling distributed more uniformed
+                            pooling["update_delay"] = randint(1, max(int(update_interval), 1)) \
+                                if update_delay == -1 else 0
+                            pooling["update_interval"] = pooling["update_delay"] \
+                                if pooling["update_delay"] > 0 else pooling["original_update_interval"]
 
-                        bacnet_object = pooling["bacnet_object"]
+                            bacnet_object = pooling["bacnet_object"]
 
-                        if enable_skip_device:
-                            if not skip_device_id == -1:
-                                if skip_device_id == bacnet_object.get_device_id():
-                                    continue
-                                else:
-                                    skip_device_id = -1
-                                    fault_count = 0
+                            object_type_code = bacnet_object.get_object_type_code()
+                            object_id = bacnet_object.get_id()
+                            read_app = pooling["read_app"]
 
-                        device_id = bacnet_object.get_device_id()
-                        object_type_code = bacnet_object.get_object_type_code()
-                        object_id = bacnet_object.get_id()
-                        read_app = pooling["read_app"]
+                            # execute BAC0 or other app
+                            data = slicer.execute(read_app,
+                                                  device_id=device_id,
+                                                  object_type=object_type_code,
+                                                  object_id=object_id,
+                                                  fields=self.pooling_fields)
+                            data = {}
+                            if len(data) == 0:
+                                logger.error("Failed collect device: {} data of: {}".format(
+                                    device_id, bacnet_object.get_object_reference()))
+                                data["fault"] = True
 
-                        # execute BAC0 or other app
-                        data = slicer.execute(read_app,
-                                              device_id=device_id,
-                                              object_type=object_type_code,
-                                              object_id=object_id,
-                                              fields=self.pooling_fields)
-                        if len(data) == 0:
-                            logger.error("Failed collect data of: {}".format(bacnet_object.get_object_reference()))
-                            data["fault"] = True
-                            if enable_skip_device:
-                                fault_count += 1
-                                if fault_count >= max_fault_count_before_skip:
-                                    skip_device_id = device_id
-                                    logger.info("Skip device pooling: {} because of more then {} fault objects".format(
-                                        device_id, max_fault_count_before_skip))
+                            # TODO if data pooling failed? reset last success pooling ?
+                            pooling["time_last_success_pooling"] = time.time()
 
-                        # TODO if data pooling failed? reset last success pooling ?
-                        pooling["time_last_success_pooling"] = time.time()
+                            self.verifier.push_collected_data(bacnet_object, data)
 
-                        self.verifier.push_collected_data(bacnet_object, data)
-                        # self.statistic_parsed_object_count += 1
-                    except:
-                        logger.exception("Failed execute slice")
-                    if statistic.enabled():
-                        duration = time.time() - t0
-                        statistic.update_read_object_statistic(1, duration)
+                            # skip pooling current device and shuffle data points if necessary
+                            if "fault" in data and enable_skip_device:
+                                shuffle_data_points_of_device_id = device_id
+                                break
+                        except:
+                            logger.exception("Failed execute slice")
+                        if statistic.enabled():
+                            duration = time.time() - t0
+                            statistic.update_read_object_statistic(1, duration)
+                if not shuffle_data_points_of_device_id == -1:
+                    shuffle(data_points)
+                    shuffle_data_points_of_device_id = -1
             time.sleep(self.period)
 
 
@@ -944,6 +906,8 @@ if __name__ == '__main__':
                 _devices = port_devices[port]
                 data_collector_objects = []
                 for device in _devices:
+                    if logger.isEnabledFor(logging.INFO):
+                        logger.info("Collecting data points for device: {}".format(device))
                     if device.get_read_app() is None:
                         logger.error("Device: {} read app not specified, ignore collecting data from device".format(
                             device.get_id()))
@@ -951,9 +915,9 @@ if __name__ == '__main__':
 
                     for object_type in object_types:
                         objects = client.rq_device_object(device.get_id(), object_type)
-                        if logger.isEnabledFor(logging.DEBUG):
+                        if logger.isEnabledFor(logging.INFO):
                             object_ids = [x[ObjectProperty.OBJECT_IDENTIFIER.id()] for x in objects]
-                            logger.debug(
+                            logger.info(
                                 "Collector# {} device: {} type: {} objects: {}".format(thread_idx,
                                                                                        device.get_id(),
                                                                                        object_type,
@@ -967,11 +931,13 @@ if __name__ == '__main__':
                         for o in objects:
                             bacnet_object = BACnetObject(o)
                             notification_class_id = bacnet_object.get_notification_class()
-                            notification_class = bacnet_network.find_by_type(ObjectType.NOTIFICATION_CLASS,
-                                                                             notification_class_id)
-                            if notification_class:
-                                assert (type(notification_class) == NotificationClass)
-                                bacnet_object.set_notification_object(notification_class)
+                            if not notification_class_id == 0:
+                                # TODO time duration of find_by_type ?
+                                notification_class = bacnet_network.find_by_type(ObjectType.NOTIFICATION_CLASS,
+                                                                                 notification_class_id)
+                                if notification_class:
+                                    assert (type(notification_class) == NotificationClass)
+                                    bacnet_object.set_notification_object(notification_class)
                             bacnet_network.append(bacnet_object)
                             data_collector_objects.append(bacnet_object)
 
