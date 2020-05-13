@@ -732,7 +732,6 @@ class VisiobasThreadDataCollector(Thread):
                                                   object_type=object_type_code,
                                                   object_id=object_id,
                                                   fields=self.pooling_fields)
-                            data = {}
                             if len(data) == 0:
                                 logger.error("Failed collect device: {} data of: {}".format(
                                     device_id, bacnet_object.get_object_reference()))
