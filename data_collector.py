@@ -89,7 +89,7 @@ statistic.start()
 
 class VisiobasTransmitter(Thread):
 
-    def __init__(self, gate_client, period: int = 5):
+    def __init__(self, gate_client, period: int = 0.1):
         """
         :param gate_client:
         :param period: time in seconds waiting new data before send collected data to server
@@ -110,6 +110,7 @@ class VisiobasTransmitter(Thread):
             ObjectProperty.PRIORITY_ARRAY.id()
         ]
         self.enabled = True
+        self.max_objects_per_request = 10
 
     def set_enable(self, enabled):
         self.enabled = enabled
@@ -156,12 +157,20 @@ class VisiobasTransmitter(Thread):
                         for field in self.send_fields:
                             data[field] = bacnet_object.get(field)
                         request.append(data)
+                        if len(request) >= self.max_objects_per_request:
+                            break
                     except:
                         self.logger.exception("Failed prepare request data of: {}".format(key))
                 try:
                     self.gate_client.rq_put(device_id, request)
                 except Exception as e:
-                    self.logger.exception("Failed put data: {}".format(request))
+                    self.logger.exception("Failed put batch of data: {}".format(request))
+                    self.logger.info("Trying to put one by one...")
+                    for d in request:
+                        try:
+                            self.gate_client.rq_put(device_id, [d])
+                        except:
+                            self.logger.exception("Failed put data: {}".format(d))
                 if statistic.enabled():
                     statistic.update_send_object_statistic(len(request), time.time() - t0)
             time.sleep(self.period)
