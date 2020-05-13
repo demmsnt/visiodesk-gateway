@@ -19,7 +19,7 @@ class BACnetObject:
     def __init__(self, data):
         self._data = data
         self.configuration_files = None
-        self._default_update_interval = 3600
+        self._default_update_interval = 1
         self.property_list = None
         self.notification_object = None
 
