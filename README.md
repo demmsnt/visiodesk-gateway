@@ -17,6 +17,7 @@ visiodesk-gateway/venv/Scripts/activate.bat
 python environment should be activated (Ubuntu)  
 execute follow command
 <pre>
+cd /opt/visiodesk-gateway
 source venv/bin/activate
 </pre>
 after it terminal before input cursor should display __(venv)__  
@@ -50,6 +51,7 @@ execute data_collector.py with optional --help to get full cli help
 only devices listed in address_cache used for collection  
 configuration stored into config.visiobas.py module    
 <pre>
+cd /opt/visiodesk-gateway
 python ./data_collector.py
 </pre>
 
