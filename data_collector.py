@@ -1,3 +1,4 @@
+import json
 import logging
 import time
 import traceback
@@ -161,16 +162,21 @@ class VisiobasTransmitter(Thread):
                             break
                     except:
                         self.logger.exception("Failed prepare request data of: {}".format(key))
+                success = True
                 try:
                     self.gate_client.rq_put(device_id, request)
                 except Exception as e:
-                    self.logger.exception("Failed put batch of data: {}".format(request))
+                    success = False
+                    self.logger.exception("Failed put batch of data: {}".format(json.dumps(request)))
+
+                if not success:
                     self.logger.info("Trying to put one by one...")
                     for d in request:
                         try:
                             self.gate_client.rq_put(device_id, [d])
                         except:
-                            self.logger.exception("Failed put data: {}".format(d))
+                            self.logger.exception("Failed put data: {}".format(json.dumps([d])))
+
                 if statistic.enabled():
                     statistic.update_send_object_statistic(len(request), time.time() - t0)
             time.sleep(self.period)
