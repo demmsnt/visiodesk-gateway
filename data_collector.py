@@ -22,7 +22,7 @@ bacnet_network = BACnetNetwork()
 
 
 class Statistic(Thread):
-    def __init__(self) -> None:
+    def __init__(self):
         super().__init__()
         self.logger = logging.getLogger("visiobas.data_collector.statistic")
         self.count_read_objects = 0
