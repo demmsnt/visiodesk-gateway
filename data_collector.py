@@ -281,13 +281,14 @@ class VisiobasNotifier(Thread):
                 items = topic["items"]
                 for item in items:
                     if item["type"]["id"] == visiodesk.ItemType.MESSAGE.id():
-                        if self.__is_system_topic_item_text(item["text"]):
-                            decoded = self.__decode_system_topic_item_text(item["text"])
-                            if decoded["group_name"] == group_name \
-                                    and decoded["reference"] == reference \
-                                    and decoded["transition"] == str(transition):
-                                self.topic_id_cache[key] = topic["id"]
-                                return topic["id"]
+                        if "text" in item:
+                            if self.__is_system_topic_item_text(item["text"]):
+                                decoded = self.__decode_system_topic_item_text(item["text"])
+                                if decoded["group_name"] == group_name \
+                                        and decoded["reference"] == reference \
+                                        and decoded["transition"] == str(transition):
+                                    self.topic_id_cache[key] = topic["id"]
+                                    return topic["id"]
             return None
         except:
             self.logger.exception("Failed find topic group: {} reference: {}".format(group_name, reference))
