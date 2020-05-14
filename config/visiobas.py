@@ -10,7 +10,8 @@ visiobas_slicer = {
 }
 
 notifier = {
-    "recipient_list": [{"recipient": "VisioBAS", "transitions": [False, True, False]}]
+    "recipient_list": [{"recipient": "VisioBAS", "transitions": [False, True, False]}],
+    "event_messages": ["", "Возможно точка не исправна", ""]
 }
 
 __local = {

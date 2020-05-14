@@ -81,7 +81,10 @@ class Statistic(Thread):
     def run(self) -> None:
         while (True):
             time.sleep(10)
-            self.print_statistic()
+            try:
+                self.print_statistic()
+            except:
+                pass
 
 
 statistic = Statistic()
@@ -322,6 +325,8 @@ class VisiobasNotifier(Thread):
         topic_description = topic_description if topic_description else "[p]{} OUT OF LIMITS[/p]".format(topic_title)
         priority_id = bacnet_object.get_notification_object().get_priority(transition)
 
+        message_text = bacnet_object.get_event_message_text(transition)
+
         data = {
             "name": topic_title,
             "topic_type": {"id": topic_type},
@@ -360,7 +365,7 @@ class VisiobasNotifier(Thread):
                     "type": {
                         "id": visiodesk.ItemType.MESSAGE.id()
                     },
-                    "text": bacnet_object.get_event_message_text(transition),
+                    "text": message_text,
                     "name": "Сообщение",
                     "like": 0
                 }
@@ -648,31 +653,36 @@ class VisiobasDataVerifier(Thread):
                         is_data_fault = data_flags.get_fault()
 
                     # update state of bacnet_object depend on collected data only if data was not FAULT
-                    if not is_data_fault:
-                        for property_code in data:
-                            if property_code == ObjectProperty.STATUS_FLAGS.id():
-                                bacnet_object.set_status_flags(flags1.as_list())
-                            elif property_code == ObjectProperty.PRESENT_VALUE.id():
-                                object_type_code = bacnet_object.get_object_type_code()
-                                if object_type_code == ObjectType.ANALOG_INPUT.code() or \
-                                        object_type_code == ObjectType.ANALOG_OUTPUT.code() or \
-                                        object_type_code == ObjectType.ANALOG_VALUE.code():
-                                    bacnet_object.set_present_value(float(data[property_code]))
-                                elif object_type_code == ObjectType.MULTI_STATE_INPUT.code() or \
-                                        object_type_code == ObjectType.MULTI_STATE_OUTPUT.code() or \
-                                        object_type_code == ObjectType.MULTI_STATE_VALUE.code():
-                                    bacnet_object.set_present_value(int(float(data[property_code])))
-                                elif object_type_code == ObjectType.BINARY_INPUT.code() or \
-                                        object_type_code == ObjectType.BINARY_OUTPUT.code() or \
-                                        object_type_code == ObjectType.BINARY_VALUE.code():
-                                    v = data[property_code]
-                                    if type(v) == bool:
-                                        v = "active" if v else "inactive"
-                                    bacnet_object.set_present_value(v)
-                                else:
-                                    bacnet_object.set_present_value(data[property_code])
+                    for property_code in data:
+                        if property_code == ObjectProperty.STATUS_FLAGS.id():
+                            continue
+                        elif property_code == ObjectProperty.PRESENT_VALUE.id():
+                            if is_data_fault:
+                                # present value can be invalid when data is fault
+                                continue
+                            object_type_code = bacnet_object.get_object_type_code()
+                            if object_type_code == ObjectType.ANALOG_INPUT.code() or \
+                                    object_type_code == ObjectType.ANALOG_OUTPUT.code() or \
+                                    object_type_code == ObjectType.ANALOG_VALUE.code():
+                                bacnet_object.set_present_value(float(data[property_code]))
+                            elif object_type_code == ObjectType.MULTI_STATE_INPUT.code() or \
+                                    object_type_code == ObjectType.MULTI_STATE_OUTPUT.code() or \
+                                    object_type_code == ObjectType.MULTI_STATE_VALUE.code():
+                                bacnet_object.set_present_value(int(float(data[property_code])))
+                            elif object_type_code == ObjectType.BINARY_INPUT.code() or \
+                                    object_type_code == ObjectType.BINARY_OUTPUT.code() or \
+                                    object_type_code == ObjectType.BINARY_VALUE.code():
+                                v = data[property_code]
+                                if type(v) == bool:
+                                    v = "active" if v else "inactive"
+                                bacnet_object.set_present_value(v)
                             else:
-                                bacnet_object.set(property_code, data[property_code])
+                                bacnet_object.set_present_value(data[property_code])
+                        else:
+                            bacnet_object.set(property_code, data[property_code])
+
+                    # update new state of status flags
+                    bacnet_object.set_status_flags(flags1.as_list())
 
                     for transition in transitions:
                         self.notifier.push_transitions(bacnet_object, transition)
@@ -992,6 +1002,11 @@ if __name__ == '__main__':
                                     recipient_list = notification_class.get_recipient_list()
                                     recipient_list += config.visiobas.notifier["recipient_list"]
                                     notification_class.set_recipient_list(recipient_list)
+                                event_messages = config.visiobas.notifier["event_messages"]
+                                for i in range(0, len(event_messages)):
+                                    message = event_messages[i]
+                                    if bacnet_object.get_event_message_text(i) == "":
+                                        bacnet_object.set_event_message_text(i, message)
                             bacnet_network.append(bacnet_object)
                             data_collector_objects.append(bacnet_object)
 

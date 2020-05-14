@@ -46,7 +46,8 @@ class BACnetObject:
     def get(self, object_property, default=None):
         property_code = object_property.id() if type(object_property) == ObjectProperty else object_property
         try:
-            return self._data[property_code]
+            value = self._data[property_code]
+            return value if value is not None else default
         except:
             return default
 
@@ -169,9 +170,19 @@ class BACnetObject:
     def get_event_message_texts(self):
         return self.get(ObjectProperty.EVENT_MESSAGE_TEXTS, ["", "", "", "", ""])
 
-    def get_event_message_text(self, transition: Transition):
+    def get_event_message_text(self, transition):
         try:
-            return self.get_event_message_texts()[transition.id()]
+            idx = transition.id() if type(transition) == Transition else transition
+            return self.get_event_message_texts()[idx]
+        except:
+            return ""
+
+    def set_event_message_text(self, transition, message):
+        try:
+            idx = transition.id() if type(transition) == Transition else transition
+            messages = self.get_event_message_texts()
+            messages[idx] = message
+            self.set(ObjectProperty.EVENT_MESSAGE_TEXTS, messages)
         except:
             return ""
 
