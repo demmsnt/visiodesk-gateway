@@ -522,7 +522,7 @@ class VisiobasDataVerifier(Thread):
         try:
             key = bacnet_object.get_object_reference()
             self.collected_data[key] = (bacnet_object, data)
-            self.logger.error("VERIFIER {}".format(key))
+            self.logger.error("PUSH VERIFIER {}".format(key))
         except:
             self.logger.exception("Failed put collected data: {} object: {}".format(data, bacnet_object))
 
@@ -690,7 +690,7 @@ class VisiobasDataVerifier(Thread):
 
                     # update new state of status flags
                     bacnet_object.set_status_flags(flags1.as_list())
-                    self.logger.error("VERIFIER {}".format(bacnet_object))
+                    self.logger.error("VERIFIER {} transition {}".format(bacnet_object, transitions))
 
                     for transition in transitions:
                         self.notifier.push_transitions(bacnet_object, transition)
