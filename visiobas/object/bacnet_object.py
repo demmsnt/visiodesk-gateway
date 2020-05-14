@@ -270,6 +270,9 @@ class NotificationClass(BACnetObject):
         recipient_list = self.get(ObjectProperty.RECIPIENT_LIST)
         return recipient_list if type(recipient_list) is list else []
 
+    def set_recipient_list(self, recipient_list):
+        self.set(ObjectProperty.RECIPIENT_LIST, recipient_list)
+
     def get_priority(self, transition):
         default = [TopicPriority.TOP, TopicPriority.NORM, TopicPriority.NORM]
         try:

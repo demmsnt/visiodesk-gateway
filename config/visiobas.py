@@ -9,6 +9,10 @@ visiobas_slicer = {
     "read_timeout": 5
 }
 
+notifier = {
+    "recipient_list": [{"recipient": "VisioBAS", "transitions": [False, True, False]}]
+}
+
 __local = {
     'host': 'http://localhost',
     'port': 8080,

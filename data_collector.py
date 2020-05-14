@@ -306,6 +306,9 @@ class VisiobasNotifier(Thread):
 
     def __create_topic(self, group_name: str, bacnet_object: BACnetObject, transition: Transition, topic_type: int):
         group_id = self.__find_notification_group_id(group_name)
+        if group_id == 0:
+            self.logger.error("Failed find notification group: {}".format(group_name))
+            return
 
         description = bacnet_object.get_description()
         reference = bacnet_object.get_object_reference()
@@ -815,6 +818,7 @@ if __name__ == '__main__':
     argparser.add_argument("--enable_notifier", type=int, default=1)
     argparser.add_argument("--enable_transmitter", type=int, default=1)
     argparser.add_argument("--read_app", type=str)
+    argparser.add_argument("--notify_fault", type=int, default=0)
     args = argparser.parse_args()
 
     address_cache_path = config.visiobas.address_cache_path
@@ -972,6 +976,22 @@ if __name__ == '__main__':
                                 if notification_class:
                                     assert (type(notification_class) == NotificationClass)
                                     bacnet_object.set_notification_object(notification_class)
+                            if args.notify_fault == 1:
+                                notification_class = bacnet_object.get_notification_object()
+                                if notification_class is None:
+                                    notification_class = NotificationClass({
+                                        ObjectProperty.DEVICE_ID.id(): 1,
+                                        ObjectProperty.OBJECT_IDENTIFIER.id(): 55000,
+                                        ObjectProperty.OBJECT_TYPE.id(): ObjectType.NOTIFICATION_CLASS.name(),
+                                        ObjectProperty.OBJECT_PROPERTY_REFERENCE.id(): "Site:VisioBAS.Notification",
+                                        ObjectProperty.DESCRIPTION.id(): "Default VisioBAS Notification",
+                                        ObjectProperty.PRIORITY.id(): [2, 2, 2],
+                                        ObjectProperty.RECIPIENT_LIST.id(): config.visiobas.notifier["recipient_list"]
+                                    })
+                                else:
+                                    recipient_list = notification_class.get_recipient_list()
+                                    recipient_list += config.visiobas.notifier["recipient_list"]
+                                    notification_class.set_recipient_list(recipient_list)
                             bacnet_network.append(bacnet_object)
                             data_collector_objects.append(bacnet_object)
 
