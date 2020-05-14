@@ -789,8 +789,8 @@ class VisiobasThreadDataCollector(Thread):
                                                   fields=self.pooling_fields)
                             _dt = time.time() - _t
                             if len(data) == 0:
-                                logger.error("Failed collect device: {} data of: {}".format(
-                                    device_id, bacnet_object.get_object_reference()))
+                                logger.error("Failed collect device: {} data of: {} dt: {:.2f}".format(
+                                    device_id, bacnet_object.get_object_reference(), _dt))
                                 data["fault"] = True
 
                             # TODO if data pooling failed? reset last success pooling ?
