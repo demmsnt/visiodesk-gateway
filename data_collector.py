@@ -1016,6 +1016,8 @@ if __name__ == '__main__':
                                     message = event_messages[i]
                                     if bacnet_object.get_event_message_text(i) == "":
                                         bacnet_object.set_event_message_text(i, message)
+                                    bacnet_object.set_event_detection_enabled(True)
+                                    bacnet_object.set_event_enable([True, True, True])
                             bacnet_network.append(bacnet_object)
                             data_collector_objects.append(bacnet_object)
 

@@ -31,10 +31,7 @@ class BACnetObject:
                 texts += [text_to_normal, text_to_normal]
 
         if ObjectProperty.EVENT_ENABLE.id() in self._data:
-            event_enable = self._data[ObjectProperty.EVENT_ENABLE.id()]
-            if event_enable is not None and len(event_enable) == 3:
-                # allow event transition RESOLVE_OFFNORMAL & RESOLVE_FAULT
-                event_enable += [True, True]
+            self.set_event_enable(self._data[ObjectProperty.EVENT_ENABLE.id()])
 
     def __str__(self) -> str:
         id = self.get_id()
@@ -113,6 +110,9 @@ class BACnetObject:
     def get_event_detection_enable(self):
         return self.get(ObjectProperty.EVENT_DETECTION_ENABLE) == 1
 
+    def set_event_detection_enabled(self, enabled):
+        return self.set(ObjectProperty.EVENT_DETECTION_ENABLE, enabled)
+
     def get_alarm_value(self):
         return self.get(ObjectProperty.ALARM_VALUE)
 
@@ -188,9 +188,17 @@ class BACnetObject:
 
     def is_notification_allowed(self, transition: Transition):
         try:
-            return self.get(ObjectProperty.EVENT_ENABLE, [False, False, False, False, False])[transition.id()]
+            return self.get_event_enable()[transition.id()]
         except:
             return False
+
+    def get_event_enable(self):
+        return self.get(ObjectProperty.EVENT_ENABLE, [False, False, False, False, False])
+
+    def set_event_enable(self, event_enable: list):
+        if event_enable is not None and len(event_enable) == 3:
+            # allow event transition RESOLVE_OFFNORMAL & RESOLVE_FAULT
+            event_enable += [True, True]
 
     def get_present_value(self):
         return self.get(ObjectProperty.PRESENT_VALUE.id())
