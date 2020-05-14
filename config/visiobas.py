@@ -5,7 +5,8 @@ address_cache_path = bacnet_stack_path / "address_cache"
 
 visiobas_slicer = {
     "bacrp": (bacnet_stack_path / "bacrp").absolute(),
-    "bacrpm": (bacnet_stack_path / "bacrpm").absolute()
+    "bacrpm": (bacnet_stack_path / "bacrpm").absolute(),
+    "read_timeout": 5
 }
 
 __local = {

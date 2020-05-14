@@ -766,11 +766,13 @@ class VisiobasThreadDataCollector(Thread):
                             read_app = pooling["read_app"]
 
                             # execute BAC0 or other app
+                            _t = time.time()
                             data = slicer.execute(read_app,
                                                   device_id=device_id,
                                                   object_type=object_type_code,
                                                   object_id=object_id,
                                                   fields=self.pooling_fields)
+                            _dt = time.time() - _t
                             if len(data) == 0:
                                 logger.error("Failed collect device: {} data of: {}".format(
                                     device_id, bacnet_object.get_object_reference()))
@@ -782,7 +784,8 @@ class VisiobasThreadDataCollector(Thread):
                             self.verifier.push_collected_data(bacnet_object, data)
 
                             # skip pooling current device and shuffle data points if necessary
-                            if "fault" in data and enable_skip_device:
+                            if "fault" in data and enable_skip_device and \
+                                    _dt > config.visiobas.visiobas_slicer["read_timeout"]:
                                 shuffle_data_points_of_device_id = device_id
                                 break
                         except:
