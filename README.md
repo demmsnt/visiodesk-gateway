@@ -49,7 +49,8 @@ __Start data collector by CLI__
 execute data_collector.py with optional --help to get full cli help  
 *data collector* use *address_cache* file for it own purpose  
 only devices listed in address_cache used for collection  
-configuration stored into config.visiobas.py module    
+configuration stored into config.visiobas.py module  
+--single_thread 1 (using single thread instead of multi thread reads)    
 <pre>
 cd /opt/visiodesk-gateway
 python ./data_collector.py
