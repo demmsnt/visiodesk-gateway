@@ -431,6 +431,7 @@ class VisiobasNotifier(Thread):
                                                                                         TopicType.REQUEST.id(),
                                                                                         TopicType.REQUEST.id()]
                 topic_type = topic_type[transition.id()]
+                self.logger.info("Create topic: {} object: {} {}".format(group_name, bacnet_object, transition))
                 self.__create_topic(group_name, bacnet_object, transition, topic_type)
             else:
                 self.__append_transition_text_into_topic(topic_id, bacnet_object, transition)
