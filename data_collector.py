@@ -290,7 +290,7 @@ class VisiobasNotifier(Thread):
                                 return topic["id"]
             return None
         except:
-            self.logger.exception("Failed find topic group: {} reference: {}", group_name, reference)
+            self.logger.exception("Failed find topic group: {} reference: {}".format(group_name, reference))
             return None
 
     def __find_notification_group_id(self, group_name) -> int:
