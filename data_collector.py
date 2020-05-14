@@ -407,7 +407,7 @@ class VisiobasNotifier(Thread):
 
     def __create_notification(self, bacnet_object: BACnetObject, transition: Transition):
         notification_class = bacnet_object.get_notification_object()
-        self.logger.error("NOTIFICATION {} {}".format(bacnet_object, transition))
+        # self.logger.error("NOTIFICATION {} {}".format(bacnet_object, transition))
         if not notification_class:
             return
         recipients = notification_class.get_recipient_list()
@@ -415,13 +415,13 @@ class VisiobasNotifier(Thread):
             group_name = recipient["recipient"] if "recipient" in recipient else None
             notification_transition_allows = recipient["transitions"] if "transitions" in recipient else None
             if not group_name or not notification_transition_allows:
-                self.logger.error("NOTIFICATION group empty")
+                # self.logger.error("NOTIFICATION group empty")
                 continue
             if not bacnet_object.is_notification_allowed(transition):
-                self.logger.error("NOTIFICATION not allowed")
+                # self.logger.error("NOTIFICATION not allowed")
                 continue
             if not notification_transition_allows[transition.id()]:
-                self.logger.error("NOTIFICATION transition not allowed")
+                # self.logger.error("NOTIFICATION transition not allowed")
                 continue
 
             topic_id = self.__find_topic_id(group_name, bacnet_object, transition)
@@ -522,7 +522,7 @@ class VisiobasDataVerifier(Thread):
         try:
             key = bacnet_object.get_object_reference()
             self.collected_data[key] = (bacnet_object, data)
-            self.logger.error("PUSH VERIFIER {}".format(key))
+            # self.logger.error("PUSH VERIFIER {}".format(key))
         except:
             self.logger.exception("Failed put collected data: {} object: {}".format(data, bacnet_object))
 
@@ -690,7 +690,7 @@ class VisiobasDataVerifier(Thread):
 
                     # update new state of status flags
                     bacnet_object.set_status_flags(flags1.as_list())
-                    self.logger.error("VERIFIER {} transition {}".format(bacnet_object, transitions))
+                    # self.logger.error("VERIFIER {} transition {}".format(bacnet_object, transitions))
 
                     for transition in transitions:
                         self.notifier.push_transitions(bacnet_object, transition)
