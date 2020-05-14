@@ -1,7 +1,7 @@
 import enum
 import json
 from bacnet.bacnet import ObjectProperty, ObjectType, StatusFlags, StatusFlag
-from visiobas.visiodesk import TopicPriority
+from visiobas.visiodesk import TopicPriority, TopicType
 
 
 class Transition(enum.Enum):

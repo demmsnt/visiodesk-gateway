@@ -17,6 +17,7 @@ from visiobas.object.bacnet_object import BACnetObject, Device, NotificationClas
 from visiobas import visiodesk
 from bacnet.network import BACnetNetwork
 import config.logging
+from visiobas.visiodesk import TopicType
 
 bacnet_network = BACnetNetwork()
 
@@ -303,7 +304,7 @@ class VisiobasNotifier(Thread):
             self.logger.exception("Failed find group: {}".format(group_name))
             return 0
 
-    def __create_topic(self, group_name: str, bacnet_object: BACnetObject, transition: Transition):
+    def __create_topic(self, group_name: str, bacnet_object: BACnetObject, transition: Transition, topic_type: int):
         group_id = self.__find_notification_group_id(group_name)
 
         description = bacnet_object.get_description()
@@ -320,7 +321,7 @@ class VisiobasNotifier(Thread):
 
         data = {
             "name": topic_title,
-            "topic_type": {"id": visiodesk.TopicType.EVENT.id()},
+            "topic_type": {"id": topic_type},
             "items": [
                 {
                     "type": {
@@ -417,7 +418,11 @@ class VisiobasNotifier(Thread):
                     continue
                 if transition == Transition.RESOLVE_FAULT:
                     continue
-                self.__create_topic(group_name, bacnet_object, transition)
+                topic_type = recipient["topic_type"] if "topic_type" in recipient else [TopicType.REQUEST.id(),
+                                                                                        TopicType.REQUEST.id(),
+                                                                                        TopicType.REQUEST.id()]
+                topic_type = topic_type[transition.id()]
+                self.__create_topic(group_name, bacnet_object, transition, topic_type)
             else:
                 self.__append_transition_text_into_topic(topic_id, bacnet_object, transition)
                 # self.__change_status_if_necessary(topic_id, bacnet_object)
@@ -655,8 +660,8 @@ class VisiobasDataVerifier(Thread):
                                         object_type_code == ObjectType.MULTI_STATE_VALUE.code():
                                     bacnet_object.set_present_value(int(float(data[property_code])))
                                 elif object_type_code == ObjectType.BINARY_INPUT.code() or \
-                                     object_type_code == ObjectType.BINARY_OUTPUT.code() or \
-                                     object_type_code == ObjectType.BINARY_VALUE.code():
+                                        object_type_code == ObjectType.BINARY_OUTPUT.code() or \
+                                        object_type_code == ObjectType.BINARY_VALUE.code():
                                     v = data[property_code]
                                     if type(v) == bool:
                                         v = "active" if v else "inactive"
