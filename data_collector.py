@@ -837,6 +837,7 @@ if __name__ == '__main__':
     argparser.add_argument("--enable_transmitter", type=int, default=1)
     argparser.add_argument("--read_app", type=str)
     argparser.add_argument("--notify_fault", type=int, default=0)
+    argparser.add_argument("--single_thread", type=int, default=0)
     args = argparser.parse_args()
 
     address_cache_path = config.visiobas.address_cache_path
@@ -920,6 +921,9 @@ if __name__ == '__main__':
                     logger.warning("Using bacwi port value for data collection.\n\
                                    Too resolve this issue update bacwi table or update server port value")
                     server_device.set_port(port)
+
+                if args.single_thread == 1:
+                    port = 47808
 
                 if port not in port_devices:
                     port_devices[port] = []
