@@ -998,6 +998,7 @@ if __name__ == '__main__':
                                         ObjectProperty.PRIORITY.id(): [2, 2, 2],
                                         ObjectProperty.RECIPIENT_LIST.id(): config.visiobas.notifier["recipient_list"]
                                     })
+                                    bacnet_object.set_notification_object(notification_class)
                                 else:
                                     recipient_list = notification_class.get_recipient_list()
                                     recipient_list += config.visiobas.notifier["recipient_list"]
