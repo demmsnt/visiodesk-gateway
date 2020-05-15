@@ -899,7 +899,7 @@ class VisiobasThreadDataCollector(Thread):
                                 pooling_fields = self.analog_pooling_fields \
                                     if object_type_code == ObjectType.ANALOG_INPUT.code() or \
                                        object_type_code == ObjectType.MULTI_STATE_INPUT.code() or \
-                                       object_type_code == ObjectType.MULTI_STATE_INPUT.code() \
+                                       object_type_code == ObjectType.BINARY_INPUT.code() \
                                     else self.pooling_fields
                                 data = slicer.execute(read_app,
                                                       device_id=device_id,
