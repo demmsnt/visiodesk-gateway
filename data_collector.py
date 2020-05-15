@@ -144,12 +144,11 @@ class VisiobasTransmitter(Thread):
         except:
             self.logger.exception("Failed put collected data: {}".format(bacnet_object))
 
-    def __make_request(self, request):
+    def __make_request(self, device_id, request):
         sended = len(request)
         if sended == 0:
             return
         t0 = time.time()
-        device_id = request[0][ObjectProperty.DEVICE_ID.id()]
         success = True
         try:
             rejected = self.gate_client.rq_put(device_id, request)
@@ -174,36 +173,35 @@ class VisiobasTransmitter(Thread):
                 except:
                     self.logger.exception("Failed put data: {}".format(json.dumps([d])))
         if statistic.enabled():
-            statistic.update_send_object_statistic(sended, self.collected_queue.qsize, time.time() - t0)
+            statistic.update_send_object_statistic(sended, self.collected_queue.qsize(), time.time() - t0)
 
     def run(self) -> None:
         while True:
             try:
                 send_list = []
                 t0 = time.time()
-                while len(send_list) < self.max_objects_per_request or (time.time() - t0) < 2:
+                while len(send_list) < self.max_objects_per_request and (time.time() - t0) < 2:
                     try:
                         bacnet_object = self.collected_queue.get(True, 1)
                         data = {}
                         for field in self.send_fields:
                             data[field] = bacnet_object.get(field)
-                        send_list.append(data)
+                        send_list.append((bacnet_object.get_device_id(), data))
                     except queue.Empty:
                         pass
 
-                device_id = -1
+                request_device_id = -1
                 request = []
                 while not len(send_list) == 0:
-                    data = send_list.pop()
-                    if device_id == -1:
-                        device_id = data[ObjectProperty.DEVICE_ID.id()]
-                    if data[ObjectProperty.DEVICE_ID.id()] == device_id:
+                    device_id, data = send_list.pop()
+                    if request_device_id == -1:
+                        request_device_id = device_id
+                    if request_device_id == device_id:
                         request.append(data)
-                    if len(send_list.pop()) == 0 or not data[ObjectProperty.DEVICE_ID.id()] == device_id:
-                        self.__make_request(request)
+                    if len(send_list) == 0 or not request_device_id == device_id:
+                        self.__make_request(request_device_id, request)
                         request = []
-                        device_id = -1
-
+                        request_device_id = -1
 
                 # if self.collected_queue.qsize() == 0:
                 #     continue
@@ -866,65 +864,68 @@ class VisiobasThreadDataCollector(Thread):
         enable_skip_device = len(self.data_pooling) > 1
 
         while True:
-            slicer = BACnetSlicer(config.visiobas.visiobas_slicer)
-            now = time.time()
-            for device_id in self.data_pooling:
-                data_points = self.data_pooling[device_id]
-                for pooling in data_points:
-                    time_last_success_pooling = pooling["time_last_success_pooling"]
-                    update_delay = pooling["update_delay"]
-                    update_interval = pooling["update_interval"]
-                    if now - time_last_success_pooling > update_interval:
-                        t0 = time.time()
-                        try:
-                            # make sensor pooling distributed more uniformed
-                            pooling["update_delay"] = randint(1, max(int(update_interval), 1)) \
-                                if update_delay == -1 else 0
-                            pooling["update_interval"] = pooling["update_delay"] \
-                                if pooling["update_delay"] > 0 else pooling["original_update_interval"]
+            try:
+                slicer = BACnetSlicer(config.visiobas.visiobas_slicer)
+                now = time.time()
+                for device_id in self.data_pooling:
+                    data_points = self.data_pooling[device_id]
+                    for pooling in data_points:
+                        time_last_success_pooling = pooling["time_last_success_pooling"]
+                        update_delay = pooling["update_delay"]
+                        update_interval = pooling["update_interval"]
+                        if now - time_last_success_pooling > update_interval:
+                            t0 = time.time()
+                            try:
+                                # make sensor pooling distributed more uniformed
+                                pooling["update_delay"] = randint(1, max(int(update_interval), 1)) \
+                                    if update_delay == -1 else 0
+                                pooling["update_interval"] = pooling["update_delay"] \
+                                    if pooling["update_delay"] > 0 else pooling["original_update_interval"]
 
-                            bacnet_object = pooling["bacnet_object"]
+                                bacnet_object = pooling["bacnet_object"]
 
-                            object_type_code = bacnet_object.get_object_type_code()
-                            object_id = bacnet_object.get_id()
-                            read_app = pooling["read_app"]
+                                object_type_code = bacnet_object.get_object_type_code()
+                                object_id = bacnet_object.get_id()
+                                read_app = pooling["read_app"]
 
-                            # execute BAC0 or other app
-                            _t = time.time()
-                            data = slicer.execute(read_app,
-                                                  device_id=device_id,
-                                                  object_type=object_type_code,
-                                                  object_id=object_id,
-                                                  fields=self.pooling_fields)
-                            _dt = time.time() - _t
-                            if len(data) == 0:
-                                logger.error("Failed collect device: {} data of: {} dt: {:.2f}".format(
-                                    device_id, bacnet_object.get_object_reference(), _dt))
-                                data["fault"] = True
+                                # execute BAC0 or other app
+                                _t = time.time()
+                                data = slicer.execute(read_app,
+                                                      device_id=device_id,
+                                                      object_type=object_type_code,
+                                                      object_id=object_id,
+                                                      fields=self.pooling_fields)
+                                _dt = time.time() - _t
+                                if len(data) == 0:
+                                    logger.error("Failed collect device: {} data of: {} dt: {:.2f}".format(
+                                        device_id, bacnet_object.get_object_reference(), _dt))
+                                    data["fault"] = True
 
-                            # TODO if data pooling failed? reset last success pooling ?
-                            pooling["time_last_success_pooling"] = time.time()
+                                # TODO if data pooling failed? reset last success pooling ?
+                                pooling["time_last_success_pooling"] = time.time()
 
-                            self.verifier.push_collected_data(bacnet_object, data)
+                                self.verifier.push_collected_data(bacnet_object, data)
 
-                            # skip pooling current device and shuffle data points if necessary
-                            if "fault" in data and enable_skip_device and \
-                                    _dt > config.visiobas.visiobas_slicer["read_timeout"]:
-                                shuffle_data_points_of_device_id = device_id
-                                break
-                        except:
-                            logger.exception("Failed execute slice")
-                        if statistic.enabled():
-                            duration = time.time() - t0
-                            statistic.update_read_object_statistic(1, duration)
-                if not shuffle_data_points_of_device_id == -1:
-                    statistic.add_not_responding_device(device_id)
-                    if logger.isEnabledFor(logging.INFO):
-                        logger.info("Device pooling skipped: {}".format(device_id))
-                    shuffle(data_points)
-                    shuffle_data_points_of_device_id = -1
-                else:
-                    statistic.remove_not_responding_device(device_id)
+                                # skip pooling current device and shuffle data points if necessary
+                                if "fault" in data and enable_skip_device and \
+                                        _dt > config.visiobas.visiobas_slicer["read_timeout"]:
+                                    shuffle_data_points_of_device_id = device_id
+                                    break
+                            except:
+                                logger.exception("Failed execute slice")
+                            if statistic.enabled():
+                                duration = time.time() - t0
+                                statistic.update_read_object_statistic(1, duration)
+                    if not shuffle_data_points_of_device_id == -1:
+                        statistic.add_not_responding_device(device_id)
+                        if logger.isEnabledFor(logging.INFO):
+                            logger.info("Device pooling skipped: {}".format(device_id))
+                        shuffle(data_points)
+                        shuffle_data_points_of_device_id = -1
+                    else:
+                        statistic.remove_not_responding_device(device_id)
+            except:
+                self.logger.exception("Failed data collected")
             time.sleep(self.period)
 
 
