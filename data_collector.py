@@ -68,13 +68,15 @@ class Statistic(Thread):
             return
 
         read_rate = self.count_read_objects / self.duration_read_objects_sec
-        verify_and_send_count = self.count_verified_objects + self.count_send_objects
-        duration_verify_and_send = self.duration_verify_objects_sec + self.duration_send_objects_sec
-        verify_and_send_rate = verify_and_send_count / duration_verify_and_send
+        verify_rate = self.count_verified_objects / self.duration_verify_objects_sec
+        send_rate = self.count_send_objects / self.duration_send_objects_sec
+
         self.logger.info("\nread ............. {}, total duration: {:.2f} sec, rate {:.2f} objects / sec"
-                         "\nverify and send... {}, total duration: {:.2f} sec, rate {:.2f} objects / sec".format(
+                         "\nverify ........... {}, total duration: {:.2f} sec, rate {:.2f} objects / sec"
+                         "\nsend ............. {}, total durationL {:.2f} sec, rate {:.2f} objects / sec".format(
             self.count_read_objects, self.duration_read_objects_sec, read_rate,
-            verify_and_send_count, duration_verify_and_send, verify_and_send_rate))
+            self.count_verified_objects, self.duration_verify_objects_sec, verify_rate,
+            self.count_send_objects, self.duration_send_objects_sec, send_rate))
         if not len(self.devices_not_responding) == 0:
             self.logger.info("NOT responding devices: {}".format(self.devices_not_responding))
 
