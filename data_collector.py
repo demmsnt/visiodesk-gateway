@@ -763,7 +763,8 @@ class VisiobasDataVerifier(Thread):
                             if property_code == ObjectProperty.STATUS_FLAGS.id():
                                 continue
                             if property_code == ObjectProperty.PRIORITY_ARRAY.id():
-                                if type(data[property_code]) == list:
+                                v = data[property_code]
+                                if type(v) == list and len(v) == 16:
                                     bacnet_object.set(property_code, data[property_code])
                             elif property_code == ObjectProperty.PRESENT_VALUE.id():
                                 if is_data_fault:
