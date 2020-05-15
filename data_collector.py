@@ -827,6 +827,12 @@ class VisiobasThreadDataCollector(Thread):
             ObjectProperty.STATUS_FLAGS.id(),
             ObjectProperty.PRIORITY_ARRAY.id()
         ]
+        self.analog_pooling_fields = [
+            ObjectProperty.OUT_OF_SERVICE.id(),
+            ObjectProperty.PRESENT_VALUE.id(),
+            ObjectProperty.RELIABILITY.id(),
+            ObjectProperty.STATUS_FLAGS.id()
+        ]
 
     def add_object(self, bacnet_object: BACnetObject):
         device_id = bacnet_object.get_device_id()
@@ -890,11 +896,16 @@ class VisiobasThreadDataCollector(Thread):
 
                                 # execute BAC0 or other app
                                 _t = time.time()
+                                pooling_fields = self.analog_pooling_fields \
+                                    if object_type_code == ObjectType.ANALOG_INPUT.code() or \
+                                       object_type_code == ObjectType.MULTI_STATE_INPUT.code() or \
+                                       object_type_code == ObjectType.MULTI_STATE_INPUT.code() \
+                                    else self.pooling_fields
                                 data = slicer.execute(read_app,
                                                       device_id=device_id,
                                                       object_type=object_type_code,
                                                       object_id=object_id,
-                                                      fields=self.pooling_fields)
+                                                      fields=pooling_fields)
                                 _dt = time.time() - _t
                                 if len(data) == 0:
                                     logger.error("Failed collect device: {} data of: {} dt: {:.2f}".format(
