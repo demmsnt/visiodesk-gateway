@@ -7,6 +7,7 @@ from pathlib import Path
 from threading import Thread
 from random import randint, shuffle
 import argparse
+import queue
 
 import config.visiobas
 from bacnet.bacnet import ObjectProperty, StatusFlags, StatusFlag, ObjectType
@@ -30,6 +31,7 @@ class Statistic(Thread):
         self.count_verified_objects = 0
         self.count_notified_objects = 0
         self.count_send_objects = 0
+        self.count_send_queue = 0
         self.duration_read_objects_sec = 0
         self.duration_verify_objects_sec = 0
         self.duration_notified_objects_sec = 0
@@ -55,8 +57,9 @@ class Statistic(Thread):
         self.count_verified_objects += inc
         self.duration_verify_objects_sec += duration
 
-    def update_send_object_statistic(self, inc, duration):
+    def update_send_object_statistic(self, inc, left, duration):
         self.count_send_objects += inc
+        self.count_send_queue = left
         self.duration_send_objects_sec += duration
 
     def update_notified_object_statistic(self, inc, duration):
@@ -71,12 +74,12 @@ class Statistic(Thread):
         verify_rate = self.count_verified_objects / self.duration_verify_objects_sec
         send_rate = self.count_send_objects / self.duration_send_objects_sec
 
-        self.logger.info("\nread ............. {}, total duration: {:.2f} sec, rate {:.2f} objects / sec"
-                         "\nverify ........... {}, total duration: {:.2f} sec, rate {:.2f} objects / sec"
-                         "\nsend ............. {}, total durationL {:.2f} sec, rate {:.2f} objects / sec".format(
+        self.logger.info("\nread ............. {}     , total duration: {:.2f} sec, rate {:.2f} objects / sec"
+                         "\nverify ........... {}     , total duration: {:.2f} sec, rate {:.2f} objects / sec"
+                         "\nsend ............. {} ({}), total durationL {:.2f} sec, rate {:.2f} objects / sec".format(
             self.count_read_objects, self.duration_read_objects_sec, read_rate,
             self.count_verified_objects, self.duration_verify_objects_sec, verify_rate,
-            self.count_send_objects, self.duration_send_objects_sec, send_rate))
+            self.count_send_objects, self.count_send_queue, self.duration_send_objects_sec, send_rate))
         if not len(self.devices_not_responding) == 0:
             self.logger.info("NOT responding devices: {}".format(self.devices_not_responding))
 
@@ -104,7 +107,8 @@ class VisiobasTransmitter(Thread):
         super().__init__()
         # global collected data should be transmitted to server
         self.device_ids = []
-        self.collected_data = {}
+        # self.collected_data = {}
+        self.collected_queue = queue.Queue(10000)
         self.gate_client = gate_client
         self.period = period
         self.logger = logging.getLogger('visiobas.data_collector.transmitter')
@@ -130,69 +134,156 @@ class VisiobasTransmitter(Thread):
             # _device_id = data[ObjectProperty.DEVICE_ID.id()]
             key = bacnet_object.get_object_reference()
             device_id = bacnet_object.get_device_id()
-            self.collected_data[key] = bacnet_object
+            # self.collected_data[key] = bacnet_object
+            if self.collected_queue.full():
+                # free the most latests data and put append queue with new one
+                self.collected_queue.get()
+            self.collected_queue.put(bacnet_object)
             if device_id not in self.device_ids:
                 self.device_ids.append(device_id)
         except:
             self.logger.exception("Failed put collected data: {}".format(bacnet_object))
 
+    def __make_request(self, request):
+        sended = len(request)
+        if sended == 0:
+            return
+        t0 = time.time()
+        device_id = request[0][ObjectProperty.DEVICE_ID.id()]
+        success = True
+        try:
+            rejected = self.gate_client.rq_put(device_id, request)
+            for o in rejected:
+                self.logger.error("Rejected: {}".format(o))
+            if not len(rejected) == 0:
+                sended -= len(rejected)
+                self.logger.error("Rejected request: {}".format(json.dumps(request)))
+        except Exception as e:
+            success = False
+            self.logger.exception("Failed put batch of data: {}".format(json.dumps(request)))
+
+        if not success:
+            self.logger.info("Trying to put one by one...")
+            for d in request:
+                try:
+                    rejected = self.gate_client.rq_put(device_id, [d])
+                    for o in rejected:
+                        sended -= 1
+                        self.logger.error("Rejected: {}".format(o))
+                        self.logger.error("Rejected request: {}".format(json.dumps([d])))
+                except:
+                    self.logger.exception("Failed put data: {}".format(json.dumps([d])))
+        if statistic.enabled():
+            statistic.update_send_object_statistic(sended, self.collected_queue.qsize, time.time() - t0)
+
     def run(self) -> None:
         while True:
-            if len(self.collected_data) == 0:
-                continue
-            if len(self.device_ids) == 0:
-                continue
-
-            if self.logger.isEnabledFor(logging.DEBUG):
-                logger.debug("Prepare collected data size: {} of devices: {} for sending".format(
-                    len(self.collected_data), self.device_ids))
-
-            device_ids = self.device_ids.copy()
-            # iterate over all object devices to be able to send all different device objects
-            while device_ids:
-                device_id = device_ids.pop()
-                keys_group_by_device = list(
-                    filter(lambda key: self.collected_data[key].get_device_id() == device_id, self.collected_data))
-                # remove from collected data grouped devices
-                request = []
+            try:
+                send_list = []
                 t0 = time.time()
-                for key in keys_group_by_device:
+                while len(send_list) < self.max_objects_per_request or (time.time() - t0) < 2:
                     try:
-                        bacnet_object = self.collected_data.pop(key)
-                        # send only necessary fields
+                        bacnet_object = self.collected_queue.get(True, 1)
                         data = {}
                         for field in self.send_fields:
                             data[field] = bacnet_object.get(field)
+                        send_list.append(data)
+                    except queue.Empty:
+                        pass
+
+                device_id = -1
+                request = []
+                while not len(send_list) == 0:
+                    data = send_list.pop()
+                    if device_id == -1:
+                        device_id = data[ObjectProperty.DEVICE_ID.id()]
+                    if data[ObjectProperty.DEVICE_ID.id()] == device_id:
                         request.append(data)
-                        if len(request) >= self.max_objects_per_request:
-                            break
-                    except:
-                        self.logger.exception("Failed prepare request data of: {}".format(key))
-                success = True
-                try:
-                    rejected = self.gate_client.rq_put(device_id, request)
-                    for o in rejected:
-                        self.logger.error("Rejected: {}".format(o))
-                    if not len(rejected) == 0:
-                        self.logger.error("Rejected request: {}".format(json.dumps(request)))
-                except Exception as e:
-                    success = False
-                    self.logger.exception("Failed put batch of data: {}".format(json.dumps(request)))
+                    if len(send_list.pop()) == 0 or not data[ObjectProperty.DEVICE_ID.id()] == device_id:
+                        self.__make_request(request)
+                        request = []
+                        device_id = -1
 
-                if not success:
-                    self.logger.info("Trying to put one by one...")
-                    for d in request:
-                        try:
-                            rejected = self.gate_client.rq_put(device_id, [d])
-                            for o in rejected:
-                                self.logger.error("Rejected: {}".format(o))
-                                self.logger.error("Rejected request: {}".format(json.dumps([d])))
-                        except:
-                            self.logger.exception("Failed put data: {}".format(json.dumps([d])))
 
-                if statistic.enabled():
-                    statistic.update_send_object_statistic(len(request), time.time() - t0)
-            time.sleep(self.period)
+                # if self.collected_queue.qsize() == 0:
+                #     continue
+                # if len(self.device_ids) == 0:
+                #     continue
+                #
+                # if self.logger.isEnabledFor(logging.DEBUG):
+                #     logger.debug("Prepare collected data size: {} of devices: {} for sending".format(
+                #         self.collected_queue.qsize(), self.device_ids))
+                #
+                # send_list = []
+                # while not self.collected_queue.empty():
+                #     bacnet_object = self.collected_queue.get(True)
+                #     data = {}
+                #     for field in self.send_fields:
+                #         data[field] = bacnet_object.get(field)
+                #     send_list.append(data)
+                #     if len(send_list) >= self.max_objects_per_request:
+                #         break
+                #
+                # device_id = -1
+                # request = []
+                # while not len(send_list) == 0:
+                #     data = send_list.pop()
+                #     if device_id == -1:
+                #         device_id = data[ObjectProperty.DEVICE_ID.id()]
+                #     if not device_id == -1 and data[ObjectProperty.DEVICE_ID.id()] == device_id:
+                #         request.append(data)
+                #
+                # device_ids = self.device_ids.copy()
+                # # iterate over all object devices to be able to send all different device objects
+                # while device_ids:
+                #     device_id = device_ids.pop()
+                #     keys_group_by_device = list(
+                #         filter(lambda key: self.collected_data[key].get_device_id() == device_id, self.collected_data))
+                #     # remove from collected data grouped devices
+                #     send_list = []
+                #     t0 = time.time()
+                #     for key in keys_group_by_device:
+                #         try:
+                #             bacnet_object = self.collected_data.pop(key)
+                #             # send only necessary fields
+                #             data = {}
+                #             for field in self.send_fields:
+                #                 data[field] = bacnet_object.get(field)
+                #             send_list.append(data)
+                #             if len(send_list) >= self.max_objects_per_request:
+                #                 break
+                #         except:
+                #             self.logger.exception("Failed prepare request data of: {}".format(key))
+                #     success = True
+                #     sended = len(send_list)
+                #     try:
+                #         rejected = self.gate_client.rq_put(device_id, send_list)
+                #         for o in rejected:
+                #             self.logger.error("Rejected: {}".format(o))
+                #         if not len(rejected) == 0:
+                #             sended -= len(rejected)
+                #             self.logger.error("Rejected request: {}".format(json.dumps(send_list)))
+                #     except Exception as e:
+                #         success = False
+                #         self.logger.exception("Failed put batch of data: {}".format(json.dumps(send_list)))
+                #
+                #     if not success:
+                #         self.logger.info("Trying to put one by one...")
+                #         for d in send_list:
+                #             try:
+                #                 rejected = self.gate_client.rq_put(device_id, [d])
+                #                 for o in rejected:
+                #                     sended -= 1
+                #                     self.logger.error("Rejected: {}".format(o))
+                #                     self.logger.error("Rejected request: {}".format(json.dumps([d])))
+                #             except:
+                #                 self.logger.exception("Failed put data: {}".format(json.dumps([d])))
+                #
+                #     if statistic.enabled():
+                #         statistic.update_send_object_statistic(sended, len(self.collected_data), time.time() - t0)
+            except:
+                self.logger.exception("Failed data transmit")
+            # time.sleep(self.period)
 
 
 class VisiobasNotifier(Thread):
@@ -637,79 +728,82 @@ class VisiobasDataVerifier(Thread):
 
     def run(self) -> None:
         while True:
-            keys = list(self.collected_data.keys())
-            for key in keys:
-                t0 = time.time()
-                bacnet_object = None
-                data = None
-                try:
-                    bacnet_object, data = self.collected_data.pop(key)
-                    transitions = []
-                    flags0 = StatusFlags(bacnet_object.get_status_flags().copy())
-                    flags1 = StatusFlags(bacnet_object.get_status_flags().copy())
+            try:
+                keys = list(self.collected_data.keys())
+                for key in keys:
+                    t0 = time.time()
+                    bacnet_object = None
+                    data = None
+                    try:
+                        bacnet_object, data = self.collected_data.pop(key)
+                        transitions = []
+                        flags0 = StatusFlags(bacnet_object.get_status_flags().copy())
+                        flags1 = StatusFlags(bacnet_object.get_status_flags().copy())
 
-                    fault_flag, transition = self.verify_to_fault_transition(bacnet_object, data)
-                    flags1.set_fault(fault_flag)
-                    if transition:
-                        transitions.append(transition)
+                        fault_flag, transition = self.verify_to_fault_transition(bacnet_object, data)
+                        flags1.set_fault(fault_flag)
+                        if transition:
+                            transitions.append(transition)
 
-                    in_alarm_flag, transition = self.verify_to_offnormal_transition(bacnet_object, data)
-                    flags1.set_in_alarm(in_alarm_flag)
-                    if transition:
-                        transitions.append(transition)
+                        in_alarm_flag, transition = self.verify_to_offnormal_transition(bacnet_object, data)
+                        flags1.set_in_alarm(in_alarm_flag)
+                        if transition:
+                            transitions.append(transition)
 
-                    # handle TO_NORMAL object transition
-                    if flags0.is_abnormal() and flags1.is_normal():
-                        transitions.append(Transition.TO_NORMAL)
+                        # handle TO_NORMAL object transition
+                        if flags0.is_abnormal() and flags1.is_normal():
+                            transitions.append(Transition.TO_NORMAL)
 
-                    is_data_fault = "fault" in data
-                    if not is_data_fault:
-                        data_flags = StatusFlags(data[ObjectProperty.STATUS_FLAGS.id()]
-                                                 if ObjectProperty.STATUS_FLAGS.id() in data else None)
-                        is_data_fault = data_flags.get_fault()
+                        is_data_fault = "fault" in data
+                        if not is_data_fault:
+                            data_flags = StatusFlags(data[ObjectProperty.STATUS_FLAGS.id()]
+                                                     if ObjectProperty.STATUS_FLAGS.id() in data else None)
+                            is_data_fault = data_flags.get_fault()
 
-                    # update state of bacnet_object depend on collected data only if data was not FAULT
-                    for property_code in data:
-                        if property_code == ObjectProperty.STATUS_FLAGS.id():
-                            continue
-                        elif property_code == ObjectProperty.PRESENT_VALUE.id():
-                            if is_data_fault:
-                                # present value can be invalid when data is fault
+                        # update state of bacnet_object depend on collected data only if data was not FAULT
+                        for property_code in data:
+                            if property_code == ObjectProperty.STATUS_FLAGS.id():
                                 continue
-                            object_type_code = bacnet_object.get_object_type_code()
-                            if object_type_code == ObjectType.ANALOG_INPUT.code() or \
-                                    object_type_code == ObjectType.ANALOG_OUTPUT.code() or \
-                                    object_type_code == ObjectType.ANALOG_VALUE.code():
-                                bacnet_object.set_present_value(float(data[property_code]))
-                            elif object_type_code == ObjectType.MULTI_STATE_INPUT.code() or \
-                                    object_type_code == ObjectType.MULTI_STATE_OUTPUT.code() or \
-                                    object_type_code == ObjectType.MULTI_STATE_VALUE.code():
-                                bacnet_object.set_present_value(int(float(data[property_code])))
-                            elif object_type_code == ObjectType.BINARY_INPUT.code() or \
-                                    object_type_code == ObjectType.BINARY_OUTPUT.code() or \
-                                    object_type_code == ObjectType.BINARY_VALUE.code():
-                                v = data[property_code]
-                                if type(v) == bool:
-                                    v = "active" if v else "inactive"
-                                bacnet_object.set_present_value(v)
+                            elif property_code == ObjectProperty.PRESENT_VALUE.id():
+                                if is_data_fault:
+                                    # present value can be invalid when data is fault
+                                    continue
+                                object_type_code = bacnet_object.get_object_type_code()
+                                if object_type_code == ObjectType.ANALOG_INPUT.code() or \
+                                        object_type_code == ObjectType.ANALOG_OUTPUT.code() or \
+                                        object_type_code == ObjectType.ANALOG_VALUE.code():
+                                    bacnet_object.set_present_value(float(data[property_code]))
+                                elif object_type_code == ObjectType.MULTI_STATE_INPUT.code() or \
+                                        object_type_code == ObjectType.MULTI_STATE_OUTPUT.code() or \
+                                        object_type_code == ObjectType.MULTI_STATE_VALUE.code():
+                                    bacnet_object.set_present_value(int(float(data[property_code])))
+                                elif object_type_code == ObjectType.BINARY_INPUT.code() or \
+                                        object_type_code == ObjectType.BINARY_OUTPUT.code() or \
+                                        object_type_code == ObjectType.BINARY_VALUE.code():
+                                    v = data[property_code]
+                                    if type(v) == bool:
+                                        v = "active" if v else "inactive"
+                                    bacnet_object.set_present_value(v)
+                                else:
+                                    bacnet_object.set_present_value(data[property_code])
                             else:
-                                bacnet_object.set_present_value(data[property_code])
-                        else:
-                            bacnet_object.set(property_code, data[property_code])
+                                bacnet_object.set(property_code, data[property_code])
 
-                    # update new state of status flags
-                    bacnet_object.set_status_flags(flags1.as_list())
-                    # self.logger.error("VERIFIER {} transition {}".format(bacnet_object, transitions))
+                        # update new state of status flags
+                        bacnet_object.set_status_flags(flags1.as_list())
+                        # self.logger.error("VERIFIER {} transition {}".format(bacnet_object, transitions))
 
-                    for transition in transitions:
-                        self.notifier.push_transitions(bacnet_object, transition)
+                        for transition in transitions:
+                            self.notifier.push_transitions(bacnet_object, transition)
 
-                    self.transmitter.push_collected_data(bacnet_object)
-                except:
-                    self.logger.exception("Failed verify object: {} data: {}".format(bacnet_object, data))
-                if statistic.enabled():
-                    duration = time.time() - t0
-                    statistic.update_verified_object_statistic(1, duration)
+                        self.transmitter.push_collected_data(bacnet_object)
+                    except:
+                        self.logger.exception("Failed verify object: {} data: {}".format(bacnet_object, data))
+                    if statistic.enabled():
+                        duration = time.time() - t0
+                        statistic.update_verified_object_statistic(1, duration)
+            except:
+                self.logger.exception("Failed verifier")
             time.sleep(0.01)
 
 
