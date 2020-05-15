@@ -88,7 +88,8 @@ class TestVisiobasGateClient(unittest.TestCase):
                 ObjectProperty.OBJECT_TYPE.id(): o[ObjectProperty.OBJECT_TYPE.id()]
             }
             data.append(d)
-        self.client.rq_put(device_id, data)
+        rejected = self.client.rq_put(device_id, data)
+        self.assertEqual(0, len(rejected))
 
     def test_rq_notification_class(self):
         # not pass

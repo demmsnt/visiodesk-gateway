@@ -170,7 +170,9 @@ class VisiobasTransmitter(Thread):
                         self.logger.exception("Failed prepare request data of: {}".format(key))
                 success = True
                 try:
-                    self.gate_client.rq_put(device_id, request)
+                    rejected = self.gate_client.rq_put(device_id, request)
+                    for o in rejected:
+                        self.logger.error("Rejected: {}".format(o))
                 except Exception as e:
                     success = False
                     self.logger.exception("Failed put batch of data: {}".format(json.dumps(request)))
@@ -179,7 +181,9 @@ class VisiobasTransmitter(Thread):
                     self.logger.info("Trying to put one by one...")
                     for d in request:
                         try:
-                            self.gate_client.rq_put(device_id, [d])
+                            rejected = self.gate_client.rq_put(device_id, [d])
+                            for o in rejected:
+                                self.logger.error("Rejected: {}".format(o))
                         except:
                             self.logger.exception("Failed put data: {}".format(json.dumps([d])))
 

@@ -57,7 +57,7 @@ class VisiobasGateClient(VisiobasClient):
         """
         :param device_id: device identifier
         :param data: list of object data to put on server
-        :return:
+        :return: list of rejected data
         """
         url = "{}/vbas/gate/put/{}".format(self.get_addr(), device_id)
         headers = {
