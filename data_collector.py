@@ -121,7 +121,7 @@ class VisiobasTransmitter(Thread):
             ObjectProperty.PRIORITY_ARRAY.id()
         ]
         self.enabled = True
-        self.max_objects_per_request = 10
+        self.max_objects_per_request = 20
 
     def set_enable(self, enabled):
         self.enabled = enabled
