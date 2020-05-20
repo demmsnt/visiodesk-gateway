@@ -185,7 +185,12 @@ class VisiobasTransmitter(Thread):
                         bacnet_object = self.collected_queue.get(True, 1)
                         data = {}
                         for field in self.send_fields:
-                            data[field] = bacnet_object.get(field)
+                            if field == ObjectProperty.PRIORITY_ARRAY.id():
+                                priority = bacnet_object.get(field)
+                                if type(priority) == list and len(priority) == 16:
+                                    data[field] = priority
+                            else:
+                                data[field] = bacnet_object.get(field)
                         send_list.append((bacnet_object.get_device_id(), data))
                     except queue.Empty:
                         pass
@@ -978,7 +983,9 @@ if __name__ == '__main__':
         client = VisiobasGateClient(
             config.visiobas.visiobas_server['host'],
             config.visiobas.visiobas_server['port'],
-            config.visiobas.visiobas_server['ssl_verify'])
+            config.visiobas.visiobas_server['ssl_verify'],
+            login=config.visiobas.visiobas_server['auth']['user'],
+            md5_pwd=config.visiobas.visiobas_server['auth']['pwd'])
 
         try:
             # how often need to perform login ?

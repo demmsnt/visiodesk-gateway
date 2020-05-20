@@ -7,8 +7,8 @@ import re
 
 # TODO why need VisiobasClient or VisiobasGateClient ? move all into VisiobasClient
 class VisiobasGateClient(VisiobasClient):
-    def __init__(self, host, port, verify):
-        VisiobasClient.__init__(self, host, port, verify=verify)
+    def __init__(self, host, port, verify, login=None, md5_pwd=None):
+        VisiobasClient.__init__(self, host, port, verify=verify, login=login, md5_pwd=md5_pwd)
 
     def rq_get_device_objects(self, device_id: int, object_id: int = None, object_type: ObjectType = None):
         """
