@@ -46,6 +46,7 @@ python ./create_address_cache.py --devices 200,300
 
 
 __Start data collector by CLI__  
+./bacnet-stack folder should store bacnet apps for perform reading and writing bacnet properties  
 execute data_collector.py with optional --help to get full cli help  
 *data collector* use *address_cache* file for it own purpose  
 only devices listed in address_cache used for collection  
