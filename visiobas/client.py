@@ -28,6 +28,7 @@ class VisiobasClient:
         self.token = None
         self.user_id = None
         self.session = None
+
         self.logger = logging.getLogger(__name__)
         self.auth = None
         self.login = login
@@ -57,29 +58,31 @@ class VisiobasClient:
         return self.session
 
     # TODO add request attempt if response is 401 - Autorization issue, then try perform rq_login and send request one more time
-    def __request(self, method, url, data=None, headers=None, cookies=None, repeat=0):
-        session = self.__get_session()
-        if method == 'get':
+    def __request(self, method, url, data=None, headers=None, cookies=None, repeat=1):
+        # session = self.__get_session()
+        with requests.Session() as session:
+            if method == 'get':
+                if self.logger.isEnabledFor(logging.DEBUG):
+                    self.logger.debug("GET: {}".format(url))
+                response = session.get(url, headers=headers, cookies=cookies, auth=self.auth, verify=self.verify)
+            elif method == 'post':
+                if self.logger.isEnabledFor(logging.DEBUG):
+                    self.logger.debug("POST: {} data: {}".format(url, data))
+                response = session.post(url, data, headers=headers, auth=self.auth, verify=self.verify)
+            else:
+                raise Exception('Unsupported http method: {}'.format(method))
             if self.logger.isEnabledFor(logging.DEBUG):
-                self.logger.debug("GET: {}".format(url))
-            response = session.get(url, headers=headers, cookies=cookies, auth=self.auth, verify=self.verify)
-        elif method == 'post':
-            if self.logger.isEnabledFor(logging.DEBUG):
-                self.logger.debug("POST: {} data: {}".format(url, data))
-            response = session.post(url, data, headers=headers, auth=self.auth, verify=self.verify)
-        else:
-            raise Exception('Unsupported http method: {}'.format(method))
-        if self.logger.isEnabledFor(logging.DEBUG):
-            self.logger.debug("Response: {} data: {}".format(url, response))
-        if response.status_code == 401:
-            # Unauthorized
-            self.rq_login()
-            if repeat > 0:
-                return self.__request(method, data, headers, cookies, --repeat)
-        elif response.status_code == 403:
-            if repeat > 0:
-                return self.__request(method, data, headers, cookies, --repeat)
-        return self.__extract_response_data(response)
+                self.logger.debug("Response: {} data: {}".format(url, response))
+            if response.status_code == 401:
+                # Unauthorized
+                self.rq_login()
+                if repeat > 0:
+                    return self.__request(method, data, headers, cookies, --repeat)
+            elif response.status_code == 403:
+                if repeat > 0:
+                    self.logger.warning("(403) Repeat request url: {} data: {}".format(url, data))
+                    return self.__request(method, data, headers, cookies, --repeat)
+            return self.__extract_response_data(response)
 
     def rq_check_auth_token(self) -> bool:
         """
