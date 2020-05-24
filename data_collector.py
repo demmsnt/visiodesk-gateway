@@ -1101,7 +1101,7 @@ if __name__ == '__main__':
             # wait until all collector stop threads or shutdown on timeout
             # timeout = None if args.shutdown == 0 else args.shutdown
             app_start = time.time()
-            max_heart_beat_timeout = 5
+            max_heart_beat_timeout = 3600
             while True:
                 time_stamp = time.time()
                 if not args.shutdown == 0 and time_stamp - app_start > args.shutdown:
