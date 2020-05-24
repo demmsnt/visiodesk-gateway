@@ -122,6 +122,7 @@ class VisiobasTransmitter(Thread):
         ]
         self.enabled = True
         self.max_objects_per_request = 50
+        self.heart_beat = time.time()
 
     def set_enable(self, enabled):
         self.enabled = enabled
@@ -177,6 +178,7 @@ class VisiobasTransmitter(Thread):
 
     def run(self) -> None:
         while True:
+            self.heart_beat = time.time()
             try:
                 send_list = []
                 t0 = time.time()
@@ -207,86 +209,8 @@ class VisiobasTransmitter(Thread):
                         self.__make_request(request_device_id, request)
                         request = []
                         request_device_id = -1
-
-                # if self.collected_queue.qsize() == 0:
-                #     continue
-                # if len(self.device_ids) == 0:
-                #     continue
-                #
-                # if self.logger.isEnabledFor(logging.DEBUG):
-                #     logger.debug("Prepare collected data size: {} of devices: {} for sending".format(
-                #         self.collected_queue.qsize(), self.device_ids))
-                #
-                # send_list = []
-                # while not self.collected_queue.empty():
-                #     bacnet_object = self.collected_queue.get(True)
-                #     data = {}
-                #     for field in self.send_fields:
-                #         data[field] = bacnet_object.get(field)
-                #     send_list.append(data)
-                #     if len(send_list) >= self.max_objects_per_request:
-                #         break
-                #
-                # device_id = -1
-                # request = []
-                # while not len(send_list) == 0:
-                #     data = send_list.pop()
-                #     if device_id == -1:
-                #         device_id = data[ObjectProperty.DEVICE_ID.id()]
-                #     if not device_id == -1 and data[ObjectProperty.DEVICE_ID.id()] == device_id:
-                #         request.append(data)
-                #
-                # device_ids = self.device_ids.copy()
-                # # iterate over all object devices to be able to send all different device objects
-                # while device_ids:
-                #     device_id = device_ids.pop()
-                #     keys_group_by_device = list(
-                #         filter(lambda key: self.collected_data[key].get_device_id() == device_id, self.collected_data))
-                #     # remove from collected data grouped devices
-                #     send_list = []
-                #     t0 = time.time()
-                #     for key in keys_group_by_device:
-                #         try:
-                #             bacnet_object = self.collected_data.pop(key)
-                #             # send only necessary fields
-                #             data = {}
-                #             for field in self.send_fields:
-                #                 data[field] = bacnet_object.get(field)
-                #             send_list.append(data)
-                #             if len(send_list) >= self.max_objects_per_request:
-                #                 break
-                #         except:
-                #             self.logger.exception("Failed prepare request data of: {}".format(key))
-                #     success = True
-                #     sended = len(send_list)
-                #     try:
-                #         rejected = self.gate_client.rq_put(device_id, send_list)
-                #         for o in rejected:
-                #             self.logger.error("Rejected: {}".format(o))
-                #         if not len(rejected) == 0:
-                #             sended -= len(rejected)
-                #             self.logger.error("Rejected request: {}".format(json.dumps(send_list)))
-                #     except Exception as e:
-                #         success = False
-                #         self.logger.exception("Failed put batch of data: {}".format(json.dumps(send_list)))
-                #
-                #     if not success:
-                #         self.logger.info("Trying to put one by one...")
-                #         for d in send_list:
-                #             try:
-                #                 rejected = self.gate_client.rq_put(device_id, [d])
-                #                 for o in rejected:
-                #                     sended -= 1
-                #                     self.logger.error("Rejected: {}".format(o))
-                #                     self.logger.error("Rejected request: {}".format(json.dumps([d])))
-                #             except:
-                #                 self.logger.exception("Failed put data: {}".format(json.dumps([d])))
-                #
-                #     if statistic.enabled():
-                #         statistic.update_send_object_statistic(sended, len(self.collected_data), time.time() - t0)
             except:
                 self.logger.exception("Failed data transmit")
-            # time.sleep(self.period)
 
 
 class VisiobasNotifier(Thread):
@@ -303,6 +227,7 @@ class VisiobasNotifier(Thread):
         self.topic_id_cache = {}
         self.group_id_cache = {}
         self.description_cache = {}
+        self.heart_beat = time.time()
         # self.notification_group_name = notification_group_name
         # self.notification_group_id = self.__find_notification_group_id()
 
@@ -562,6 +487,7 @@ class VisiobasNotifier(Thread):
 
     def run(self) -> None:
         while True:
+            self.heart_beat = time.time()
             keys = list(self.transitions.keys())
             for key in keys:
                 try:
@@ -615,6 +541,7 @@ class VisiobasDataVerifier(Thread):
         self.bacnet_network = bacnet_network
         self.client = client
         self.enabled = True
+        self.heart_beat = time.time()
 
     def set_enable(self, enabled):
         self.enabled = enabled
@@ -732,6 +659,7 @@ class VisiobasDataVerifier(Thread):
     def run(self) -> None:
         while True:
             try:
+                self.heart_beat = time.time()
                 keys = list(self.collected_data.keys())
                 for key in keys:
                     t0 = time.time()
@@ -842,6 +770,7 @@ class VisiobasThreadDataCollector(Thread):
             ObjectProperty.RELIABILITY.id(),
             ObjectProperty.STATUS_FLAGS.id()
         ]
+        self.heart_beat = time.time()
 
     def add_object(self, bacnet_object: BACnetObject):
         device_id = bacnet_object.get_device_id()
@@ -881,14 +810,14 @@ class VisiobasThreadDataCollector(Thread):
         while True:
             try:
                 slicer = BACnetSlicer(config.visiobas.visiobas_slicer)
-                now = time.time()
                 for device_id in self.data_pooling:
                     data_points = self.data_pooling[device_id]
                     for pooling in data_points:
+                        self.heart_beat = time.time()
                         time_last_success_pooling = pooling["time_last_success_pooling"]
                         update_delay = pooling["update_delay"]
                         update_interval = pooling["update_interval"]
-                        if now - time_last_success_pooling > update_interval:
+                        if time.time() - time_last_success_pooling > update_interval:
                             t0 = time.time()
                             try:
                                 # make sensor pooling distributed more uniformed
@@ -916,6 +845,7 @@ class VisiobasThreadDataCollector(Thread):
                                                       object_id=object_id,
                                                       fields=pooling_fields)
                                 _dt = time.time() - _t
+                                self.last_data_collect = time.time()
                                 if len(data) == 0:
                                     logger.error("Failed collect device: {} data of: {} dt: {:.2f}".format(
                                         device_id, bacnet_object.get_object_reference(), _dt))
@@ -961,7 +891,8 @@ if __name__ == '__main__':
     argparser.add_argument("--enable_transmitter", type=int, default=1)
     argparser.add_argument("--read_app", type=str)
     argparser.add_argument("--notify_fault", type=int, default=0)
-    argparser.add_argument("--single_thread", type=int, default=0)
+    argparser.add_argument("--single_thread", type=int, default=1)
+    argparser.add_argument("--shutdown", type=int, default=0)
     args = argparser.parse_args()
 
     address_cache_path = config.visiobas.address_cache_path
@@ -1152,6 +1083,7 @@ if __name__ == '__main__':
                             data_collector_objects.append(bacnet_object)
 
                 collector = VisiobasThreadDataCollector(thread_idx, verifier, bacnet_network)
+                collector.setDaemon(True)
                 if logger.isEnabledFor(logging.INFO):
                     _device_ids = [x.get_id() for x in _devices]
                     logger.info("Collector# {} collect devices: {}".format(thread_idx, _device_ids))
@@ -1166,9 +1098,37 @@ if __name__ == '__main__':
                     os.mkdir("logs")
                 bacnet_network.save("logs/bacnet_network.txt")
 
-            # wait until all collector stop threads
-            for collector in collectors:
-                collector.join()
+            # wait until all collector stop threads or shutdown on timeout
+            # timeout = None if args.shutdown == 0 else args.shutdown
+            app_start = time.time()
+            max_heart_beat_timeout = 5
+            while True:
+                time_stamp = time.time()
+                if not args.shutdown == 0 and time_stamp - app_start > args.shutdown:
+                    logger.error("Close app because of shutdown timeout")
+                    exit(0)
+
+                for collector in collectors:
+                    if abs(time_stamp - collector.heart_beat) > max_heart_beat_timeout:
+                        logger.error("Close app because of collector seems not alive any more")
+                        exit(0)
+
+                if args.enable_transmitter == 1:
+                    if abs(time_stamp - transmitter.heart_beat) > max_heart_beat_timeout:
+                        logger.error("Close app because of transmitter seems not alive any more")
+                        exit(0)
+
+                if args.enable_notifier == 1:
+                    if abs(time_stamp - notifier.heart_beat) > max_heart_beat_timeout:
+                        logger.error("Close app because of notifier seems not alive any more")
+                        exit(0)
+
+                if args.enable_verifier == 1:
+                    if abs(time_stamp - verifier.heart_beat) > max_heart_beat_timeout:
+                        logger.error("Close app because of verifier seems not alive any more")
+                        exit(0)
+
+                time.sleep(5)
         except BaseException as e:
             client.rq_logout()
             raise e
