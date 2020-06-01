@@ -885,15 +885,23 @@ if __name__ == '__main__':
     config.logging.initialize_logging()
     logger = logging.getLogger('visiobas.data_collector')
     argparser = argparse.ArgumentParser()
-    argparser.add_argument("--device", type=int)
-    argparser.add_argument("--object", type=int)
-    argparser.add_argument("--enable_verifier", type=int, default=1)
-    argparser.add_argument("--enable_notifier", type=int, default=1)
-    argparser.add_argument("--enable_transmitter", type=int, default=1)
-    argparser.add_argument("--read_app", type=str)
-    argparser.add_argument("--notify_fault", type=int, default=0)
-    argparser.add_argument("--single_thread", type=int, default=1)
-    argparser.add_argument("--shutdown", type=int, default=0)
+    argparser.add_argument("--device", type=int,
+                           help="device identifier (request only specified device)")
+    argparser.add_argument("--object", type=int,
+                           help="object identifier (request only specified object worked with --device)")
+    argparser.add_argument("--enable_verifier", type=int, default=1,
+                           help="enable verifier module")
+    argparser.add_argument("--enable_notifier", type=int, default=1,
+                           help="enable notifier module")
+    argparser.add_argument("--enable_transmitter", type=int, default=1,
+                           help="enable transmitter module")
+    argparser.add_argument("--read_app", type=str,
+                           help="override read app")
+    argparser.add_argument("--notify_fault", type=int, default=0,)
+    argparser.add_argument("--single_thread", type=int, default=1,
+                           help="using single thread instead of multi-threading data collect")
+    argparser.add_argument("--shutdown", type=int, default=0,
+                           help="shutdown timeout (sec)")
     args = argparser.parse_args()
 
     address_cache_path = config.visiobas.address_cache_path
