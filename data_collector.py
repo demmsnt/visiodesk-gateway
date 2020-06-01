@@ -115,7 +115,6 @@ class VisiobasTransmitter(Thread):
         self.send_fields = [
             ObjectProperty.OBJECT_TYPE.id(),
             ObjectProperty.OBJECT_IDENTIFIER.id(),
-            ObjectProperty.OBJECT_PROPERTY_REFERENCE.id(),
             ObjectProperty.PRESENT_VALUE.id(),
             ObjectProperty.STATUS_FLAGS.id(),
             ObjectProperty.PRIORITY_ARRAY.id()
@@ -205,6 +204,8 @@ class VisiobasTransmitter(Thread):
                         request_device_id = device_id
                     if request_device_id == device_id:
                         request.append(data)
+                    else:
+                        send_list.append((device_id, data))
                     if len(send_list) == 0 or not request_device_id == device_id:
                         self.__make_request(request_device_id, request)
                         request = []
