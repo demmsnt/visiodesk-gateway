@@ -909,6 +909,8 @@ if __name__ == '__main__':
                            help="using single thread instead of multi-threading data collect")
     argparser.add_argument("--shutdown", type=int, default=0,
                            help="shutdown timeout (sec)")
+    argparser.add_argument("--write_put_requests", type=int, default=0,
+                           help="write update data (put request) 1 - enable, 0 - disable")
     args = argparser.parse_args()
 
     address_cache_path = config.visiobas.address_cache_path
@@ -932,7 +934,8 @@ if __name__ == '__main__':
             config.visiobas.visiobas_server['port'],
             config.visiobas.visiobas_server['ssl_verify'],
             login=config.visiobas.visiobas_server['auth']['user'],
-            md5_pwd=config.visiobas.visiobas_server['auth']['pwd'])
+            md5_pwd=config.visiobas.visiobas_server['auth']['pwd'],
+            write_put_request=args.write_put_request)
 
         try:
             # how often need to perform login ?

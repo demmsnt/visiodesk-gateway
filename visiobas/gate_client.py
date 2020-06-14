@@ -7,8 +7,9 @@ import re
 
 # TODO why need VisiobasClient or VisiobasGateClient ? move all into VisiobasClient
 class VisiobasGateClient(VisiobasClient):
-    def __init__(self, host, port, verify, login=None, md5_pwd=None):
+    def __init__(self, host, port, verify, login=None, md5_pwd=None, write_put_request=0):
         VisiobasClient.__init__(self, host, port, verify=verify, login=login, md5_pwd=md5_pwd)
+        self.write_put_request = write_put_request
 
     def rq_get_device_objects(self, device_id: int, object_id: int = None, object_type: ObjectType = None):
         """
@@ -64,6 +65,9 @@ class VisiobasGateClient(VisiobasClient):
             "Content-type": "application/json;charset=UTF-8"
         }
         js = json.dumps(data)
+        if self.write_put_request == 1:
+            with open("logs/put_request.txt", "a+") as f:
+                f.write("{}\n".format(js))
         return self.post(url, js, headers=headers)
 
     def rq_vdesk_get_status_list(self) -> list:
