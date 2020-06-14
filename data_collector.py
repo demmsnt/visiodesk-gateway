@@ -935,7 +935,7 @@ if __name__ == '__main__':
             config.visiobas.visiobas_server['ssl_verify'],
             login=config.visiobas.visiobas_server['auth']['user'],
             md5_pwd=config.visiobas.visiobas_server['auth']['pwd'],
-            write_put_request=args.write_put_request)
+            write_put_requests=args.write_put_requests)
 
         try:
             # how often need to perform login ?
