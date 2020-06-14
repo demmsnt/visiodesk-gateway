@@ -1,4 +1,8 @@
-__Python virtual environment__
+##__Install python__  
+https://www.python.org/downloads/    
+
+
+##__Python virtual environment__
 for Ubuntu users need to install python virtual env module  
 used python3 instead of python because of using python of version 3  
 <pre>
@@ -44,8 +48,13 @@ example of usage (creating address_cache file)
 python ./create_address_cache.py --devices 200,300
 </pre>
 
+##__Bacnet stack emulation__
+available for windows uses (stored under __test_visiobas/__)  
+copy __test_visiobas/bacrp.exe into vacbet-stack folder (depend on config/visiobas.py configuration)
+prepare **address_cache** file with list of devices for data collect    
+example of address_cache file stored here **test_visiobas/address_cache**
 
-__Start data collector by CLI__  
+##__Start data collector by CLI__  
 ./bacnet-stack folder should store bacnet apps for perform reading and writing bacnet properties  
 execute data_collector.py with optional --help to get full cli help  
 *data collector* use *address_cache* file for it own purpose  
