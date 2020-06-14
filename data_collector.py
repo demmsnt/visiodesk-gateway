@@ -4,6 +4,7 @@ import time
 import traceback
 import os
 from pathlib import Path
+from subprocess import TimeoutExpired
 from threading import Thread
 from random import randint, shuffle
 import argparse
@@ -840,12 +841,18 @@ class VisiobasThreadDataCollector(Thread):
                                        object_type_code == ObjectType.MULTI_STATE_INPUT.code() or \
                                        object_type_code == ObjectType.BINARY_INPUT.code() \
                                     else self.pooling_fields
-                                data = slicer.execute(read_app,
-                                                      device_id=device_id,
-                                                      object_type=object_type_code,
-                                                      object_id=object_id,
-                                                      fields=pooling_fields)
-                                _dt = time.time() - _t
+                                _dt = 0
+                                try:
+                                    data = slicer.execute(read_app,
+                                                          device_id=device_id,
+                                                          object_type=object_type_code,
+                                                          object_id=object_id,
+                                                          fields=pooling_fields,
+                                                          timeout=config.visiobas.visiobas_slicer["read_timeout"])
+                                    _dt = time.time() - _t
+                                except TimeoutExpired:
+                                    _dt = time.time() - _t
+                                    data = {}
                                 self.last_data_collect = time.time()
                                 if len(data) == 0:
                                     logger.error("Failed collect device: {} data of: {} dt: {:.2f}".format(
@@ -859,7 +866,7 @@ class VisiobasThreadDataCollector(Thread):
 
                                 # skip pooling current device and shuffle data points if necessary
                                 if "fault" in data and enable_skip_device and \
-                                        _dt > config.visiobas.visiobas_slicer["read_timeout"]:
+                                        _dt >= config.visiobas.visiobas_slicer["read_timeout"]:
                                     shuffle_data_points_of_device_id = device_id
                                     break
                             except:
@@ -897,7 +904,7 @@ if __name__ == '__main__':
                            help="enable transmitter module")
     argparser.add_argument("--read_app", type=str,
                            help="override read app")
-    argparser.add_argument("--notify_fault", type=int, default=0,)
+    argparser.add_argument("--notify_fault", type=int, default=0, )
     argparser.add_argument("--single_thread", type=int, default=1,
                            help="using single thread instead of multi-threading data collect")
     argparser.add_argument("--shutdown", type=int, default=0,
@@ -1015,15 +1022,15 @@ if __name__ == '__main__':
 
             # list of object types for collect
             object_types = [
-                ObjectType.ANALOG_INPUT,
-                ObjectType.ANALOG_OUTPUT,
-                ObjectType.ANALOG_VALUE,
+                # ObjectType.ANALOG_INPUT,
+                # ObjectType.ANALOG_OUTPUT,
+                # ObjectType.ANALOG_VALUE,
                 ObjectType.BINARY_INPUT,
-                ObjectType.BINARY_OUTPUT,
-                ObjectType.BINARY_VALUE,
-                ObjectType.MULTI_STATE_INPUT,
-                ObjectType.MULTI_STATE_OUTPUT,
-                ObjectType.MULTI_STATE_VALUE
+                # ObjectType.BINARY_OUTPUT,
+                # ObjectType.BINARY_VALUE,
+                # ObjectType.MULTI_STATE_INPUT,
+                # ObjectType.MULTI_STATE_OUTPUT,
+                # ObjectType.MULTI_STATE_VALUE
             ]
 
             collectors = []

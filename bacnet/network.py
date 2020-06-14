@@ -1,5 +1,6 @@
 from bacnet.bacnet import ObjectType
 from bacnet.bacnet import ObjectProperty
+import logging
 from visiobas.object.bacnet_object import BACnetObject
 from visiobas.object.bacnet_object import Device
 from visiobas.object.bacnet_object import NotificationClass
@@ -15,6 +16,7 @@ class BACnetNetwork:
         self.map_reference = {
             ObjectType.DEVICE.code(): {}
         }
+        self.logger = logging.getLogger('bacnet.network')
 
     def find(self, reference: str, ):
         key = self.__create_key(reference)
@@ -48,7 +50,10 @@ class BACnetNetwork:
             # group some object for improve searching
             if object_type_code == ObjectType.DEVICE.code():
                 self.map_reference[ObjectType.DEVICE.code()][o.get_id()] = o.get_object_reference()
-            self.objects[self.__create_key(o.get_object_reference())] = o
+            key = self.__create_key(o.get_object_reference())
+            if key in self.objects:
+                self.logger.warning("Multiply backnet network reference key? `PEREMES` detected?")
+            self.objects[key] = o
 
     def __create_key(self, reference):
         return reference
