@@ -67,6 +67,7 @@ class VisiobasGateClient(VisiobasClient):
         js = json.dumps(data)
         if self.write_put_requests == 1:
             with open("logs/put_request.txt", "a+") as f:
+                f.write("{}\n".format(url))
                 f.write("{}\n".format(js))
         return self.post(url, js, headers=headers)
 
