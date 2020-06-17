@@ -1025,15 +1025,15 @@ if __name__ == '__main__':
 
             # list of object types for collect
             object_types = [
-                # ObjectType.ANALOG_INPUT,
-                # ObjectType.ANALOG_OUTPUT,
-                # ObjectType.ANALOG_VALUE,
+                ObjectType.ANALOG_INPUT,
+                ObjectType.ANALOG_OUTPUT,
+                ObjectType.ANALOG_VALUE,
                 ObjectType.BINARY_INPUT,
-                # ObjectType.BINARY_OUTPUT,
-                # ObjectType.BINARY_VALUE,
-                # ObjectType.MULTI_STATE_INPUT,
-                # ObjectType.MULTI_STATE_OUTPUT,
-                # ObjectType.MULTI_STATE_VALUE
+                ObjectType.BINARY_OUTPUT,
+                ObjectType.BINARY_VALUE,
+                ObjectType.MULTI_STATE_INPUT,
+                ObjectType.MULTI_STATE_OUTPUT,
+                ObjectType.MULTI_STATE_VALUE
             ]
 
             collectors = []
