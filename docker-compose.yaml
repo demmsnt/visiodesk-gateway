@@ -1,0 +1,13 @@
+version: '3'
+services:
+
+    game-service:
+        build:
+          context: .
+          dockerfile: ./docker/app/Dockerfile
+#        ports:
+#            - 5000:5000
+        command: ["/data_collector.sh"]
+        volumes:
+          # для разработки надо менять файлы в проде их надо просто в докер закатать
+          - ./:/app/
